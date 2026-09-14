@@ -77,11 +77,12 @@ def on_startup():
                 latest_logs = df_logs.sort_values("date_obj").groupby(["facility_id", "medicine_id"]).tail(1)
                 
                 for _, row in latest_logs.iterrows():
+                    avg_c = float(df_logs[(df_logs["facility_id"] == row["facility_id"]) & (df_logs["medicine_id"] == row["medicine_id"])]["consumption"].tail(14).mean())
                     inv = FacilityInventory(
                         facility_id=int(row["facility_id"]),
                         medicine_id=int(row["medicine_id"]),
-                        current_stock=float(row["stock_level"]),
-                        avg_daily_consumption=float(df_logs[(df_logs["facility_id"] == row["facility_id"]) & (df_logs["medicine_id"] == row["medicine_id"])]["consumption"].tail(14).mean()),
+                        current_stock=int(round(float(row["stock_level"]))),
+                        avg_daily_consumption=round(avg_c, 2),
                     )
                     db.add(inv)
                 db.commit()
@@ -94,7 +95,7 @@ def on_startup():
                     db.add(FacilityInventory(
                         facility_id=dist.id,
                         medicine_id=med.id,
-                        current_stock=5000.0,
+                        current_stock=5000,
                         avg_daily_consumption=0.0,
                         status=StockStatus.surplus
                     ))
@@ -115,12 +116,17 @@ def on_startup():
                         db.add(FacilityInventory(
                             facility_id=dist.id,
                             medicine_id=med.id,
-                            current_stock=5000.0,
+                            current_stock=5000,
                             avg_daily_consumption=0.0,
                             status=StockStatus.surplus
                         ))
                         added = True
-            if added:
-                db.commit()
+            
+            # Normalize existing inventory rows: current_stock to int, avg_daily_consumption to 2 decimals
+            all_inv = db.query(FacilityInventory).all()
+            for inv in all_inv:
+                inv.current_stock = int(round(inv.current_stock))
+                inv.avg_daily_consumption = round(float(inv.avg_daily_consumption), 2)
+            db.commit()
     finally:
         db.close()

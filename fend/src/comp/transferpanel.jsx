@@ -100,7 +100,7 @@ export default function TransferPanel({
             const newT = await createTransfer({
                 requesting_facility_id: reqFacilityId,
                 medicine_id: reqMedicineId,
-                quantity_requested: parseFloat(requestQuantity),
+                quantity_requested: parseInt(requestQuantity, 10),
                 priority: 'critical'
             });
 
@@ -274,7 +274,7 @@ export default function TransferPanel({
                                                 </span>
                                             </div>
                                             <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                                                Destination: <strong style={{ color: '#1e293b' }}>{requestingFacility}</strong> &bull; Requested: {t.quantity_requested} units
+                                                Destination: <strong style={{ color: '#1e293b' }}>{requestingFacility}</strong> &bull; Requested: {Math.round(t.quantity_requested)} units
                                             </div>
                                         </div>
                                         <span style={{ fontSize: '11px', color: '#94a3b8' }}>
@@ -309,7 +309,7 @@ export default function TransferPanel({
                                                                 Supplier: {m.supplying_facility_name}
                                                             </div>
                                                             <div style={{ fontSize: '11px', color: '#475569', marginTop: '2px' }}>
-                                                                Offering: <strong>{m.quantity_offered} units</strong> &bull; {m.distance_km} km &bull; Est. Transit: {m.estimated_transit_minutes} mins
+                                                                Offering: <strong>{Math.round(m.quantity_offered)} units</strong> &bull; {m.distance_km} km &bull; Est. Transit: {m.estimated_transit_minutes} mins
                                                             </div>
                                                         </div>
 
@@ -438,10 +438,10 @@ export default function TransferPanel({
                             color: '#1e40af'
                         }}>
                             <div style={{ fontWeight: 600 }}>
-                                🤖 ML Suggested Transfer Quantity: <strong>{suggestion.suggested_quantity} units</strong>
+                                🤖 ML Suggested Transfer Quantity: <strong>{Math.round(suggestion.suggested_quantity)} units</strong>
                             </div>
                             <div style={{ fontSize: '11px', color: '#3b82f6', marginTop: '2px' }}>
-                                Based on current stock ({suggestion.based_on?.current_stock}u), consumption rate ({suggestion.based_on?.predicted_daily_consumption}/day), and {suggestion.based_on?.lead_time_days}-day lead time.
+                                Based on current stock ({Math.round(suggestion.based_on?.current_stock)}u), consumption rate ({Number(suggestion.based_on?.predicted_daily_consumption).toFixed(2)}/day), and {suggestion.based_on?.lead_time_days}-day lead time.
                             </div>
                         </div>
                     )}
@@ -453,6 +453,7 @@ export default function TransferPanel({
                         <input
                             type="number"
                             min="1"
+                            step="1"
                             value={requestQuantity}
                             onChange={(e) => setRequestQuantity(e.target.value)}
                             style={{

@@ -444,7 +444,7 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
                                                 <tr key={med.medicine_id}>
                                                     <td style={{ padding: '2px 0' }}>{med.medicine_name.split(' ')[0]}</td>
                                                     <td style={{ padding: '2px 0' }}>
-                                                        {med.current_stock}u
+                                                        {Math.round(med.current_stock)}u
                                                         <span
                                                             style={{
                                                                 display: 'inline-block',

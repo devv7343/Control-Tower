@@ -60,11 +60,11 @@ def find_candidates(db: Session, requesting_facility_id: int, medicine_id: int, 
         
         if not inv:
             if cand.type.value == "distributor":
-                available_stock = 5000.0
+                available_stock = 5000
             else:
                 continue
         else:
-            available_stock = inv.current_stock
+            available_stock = int(round(inv.current_stock))
             if inv.status != StockStatus.surplus and cand.type.value != "distributor":
                 continue
 
@@ -94,7 +94,7 @@ def find_candidates(db: Session, requesting_facility_id: int, medicine_id: int, 
         candidates.append({
             "sourceId": cand.id,
             "sourceName": cand.name,
-            "availableStock": available_stock,
+            "availableStock": int(round(available_stock)),
             "distance": round(dist_km, 1),
             "transitMinutes": transit_mins,
             "time": f"{transit_mins} mins",

@@ -150,9 +150,9 @@ class FacilityInventory(Base):
     medicine_id: Mapped[int] = mapped_column(
         ForeignKey("medicines.id", ondelete="CASCADE"), nullable=False
     )
-    current_stock: Mapped[float] = mapped_column(default=0)
-    avg_daily_consumption: Mapped[float] = mapped_column(default=0)
-    reorder_point: Mapped[Optional[float]] = mapped_column(default=None)
+    current_stock: Mapped[int] = mapped_column(default=0)
+    avg_daily_consumption: Mapped[float] = mapped_column(default=0.0)
+    reorder_point: Mapped[Optional[int]] = mapped_column(default=None)
     status: Mapped[Optional[StockStatus]] = mapped_column(SqlEnum(StockStatus), default=None)
     last_restocked_at: Mapped[Optional[datetime]] = mapped_column(default=None)
     updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
@@ -179,9 +179,9 @@ class InventoryLog(Base):
         ForeignKey("medicines.id", ondelete="CASCADE"), nullable=False
     )
     log_date: Mapped[date] = mapped_column(nullable=False)
-    stock_level: Mapped[float] = mapped_column(nullable=False)
-    consumption: Mapped[float] = mapped_column(default=0)
-    replenishment_received: Mapped[float] = mapped_column(default=0)
+    stock_level: Mapped[int] = mapped_column(nullable=False)
+    consumption: Mapped[int] = mapped_column(default=0)
+    replenishment_received: Mapped[int] = mapped_column(default=0)
     recorded_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     __table_args__ = (
@@ -205,10 +205,10 @@ class ForecastResult(Base):
         ForeignKey("medicines.id", ondelete="CASCADE"), nullable=False
     )
     forecast_date: Mapped[date] = mapped_column(nullable=False)
-    predicted_stock: Mapped[Optional[float]] = mapped_column(default=None)
+    predicted_stock: Mapped[Optional[int]] = mapped_column(default=None)
     predicted_consumption: Mapped[Optional[float]] = mapped_column(default=None)
-    confidence_lower: Mapped[Optional[float]] = mapped_column(default=None)
-    confidence_upper: Mapped[Optional[float]] = mapped_column(default=None)
+    confidence_lower: Mapped[Optional[int]] = mapped_column(default=None)
+    confidence_upper: Mapped[Optional[int]] = mapped_column(default=None)
     predicted_status: Mapped[Optional[StockStatus]] = mapped_column(SqlEnum(StockStatus), default=None)
     model_version: Mapped[Optional[str]] = mapped_column(default=None)
     generated_at: Mapped[datetime] = mapped_column(server_default=func.now())
@@ -223,11 +223,11 @@ class TransferRequest(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     requesting_facility_id: Mapped[int] = mapped_column(ForeignKey("facilities.id"), nullable=False)
     medicine_id: Mapped[int] = mapped_column(ForeignKey("medicines.id"), nullable=False)
-    quantity_requested: Mapped[float] = mapped_column(nullable=False)
+    quantity_requested: Mapped[int] = mapped_column(nullable=False)
 
     # Running total actually delivered so far against quantity_requested —
     # used to compute the remaining shortfall for a follow-up request.
-    quantity_fulfilled: Mapped[float] = mapped_column(default=0)
+    quantity_fulfilled: Mapped[int] = mapped_column(default=0)
 
     priority: Mapped[StockStatus] = mapped_column(SqlEnum(StockStatus), nullable=False)
     status: Mapped[TransferStatus] = mapped_column(
@@ -275,7 +275,7 @@ class TransferMatch(Base):
         ForeignKey("transfer_requests.id", ondelete="CASCADE"), nullable=False
     )
     supplying_facility_id: Mapped[int] = mapped_column(ForeignKey("facilities.id"), nullable=False)
-    quantity_offered: Mapped[float] = mapped_column(nullable=False)
+    quantity_offered: Mapped[int] = mapped_column(nullable=False)
     distance_km: Mapped[Optional[float]] = mapped_column(default=None)
     estimated_transit_minutes: Mapped[Optional[int]] = mapped_column(default=None)
     # proposed, accepted, rejected, delivered — enforced in application code,

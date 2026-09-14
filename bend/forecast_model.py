@@ -142,9 +142,9 @@ def recursive_forecast(model, raw_df: pd.DataFrame, horizon: int, residual_std: 
         forecasts.append({
             "date": forecast_date.date().isoformat(),
             "predicted_consumption": round(pred_consumption, 2),
-            "predicted_stock": round(predicted_stock, 2),
-            "confidence_lower": round(lower, 2),
-            "confidence_upper": round(upper, 2),
+            "predicted_stock": int(round(predicted_stock)),
+            "confidence_lower": int(round(lower)),
+            "confidence_upper": int(round(upper)),
         })
 
         # append the prediction as a synthetic row so the NEXT iteration's
@@ -153,9 +153,9 @@ def recursive_forecast(model, raw_df: pd.DataFrame, horizon: int, residual_std: 
             "date": forecast_date,
             "facility_id": history["facility_id"].iloc[-1],
             "medicine_id": history["medicine_id"].iloc[-1],
-            "stock_level": predicted_stock,
-            "consumption": pred_consumption,
-            "replenishment_received": 0.0,
+            "stock_level": int(round(predicted_stock)),
+            "consumption": round(pred_consumption, 2),
+            "replenishment_received": 0,
         }
         history = pd.concat([history, pd.DataFrame([new_row])], ignore_index=True)
         last_stock = predicted_stock

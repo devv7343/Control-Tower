@@ -62,9 +62,9 @@ CREATE TABLE facility_inventory (
     id SERIAL PRIMARY KEY,
     facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
     medicine_id INTEGER NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
-    current_stock NUMERIC(10,2) NOT NULL DEFAULT 0,
+    current_stock INTEGER NOT NULL DEFAULT 0,
     avg_daily_consumption NUMERIC(10,2) DEFAULT 0,
-    reorder_point NUMERIC(10,2),
+    reorder_point INTEGER,
     status stock_status,                            -- cached output of triage_engine
     last_restocked_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ DEFAULT now(),
@@ -81,9 +81,9 @@ CREATE TABLE inventory_logs (
     facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
     medicine_id INTEGER NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
     log_date DATE NOT NULL,
-    stock_level NUMERIC(10,2) NOT NULL,
-    consumption NUMERIC(10,2) DEFAULT 0,
-    replenishment_received NUMERIC(10,2) DEFAULT 0,
+    stock_level INTEGER NOT NULL,
+    consumption INTEGER DEFAULT 0,
+    replenishment_received INTEGER DEFAULT 0,
     recorded_at TIMESTAMPTZ DEFAULT now(),
     UNIQUE (facility_id, medicine_id, log_date)
 );
@@ -98,10 +98,10 @@ CREATE TABLE forecast_results (
     facility_id INTEGER NOT NULL REFERENCES facilities(id) ON DELETE CASCADE,
     medicine_id INTEGER NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
     forecast_date DATE NOT NULL,
-    predicted_stock NUMERIC(10,2),
+    predicted_stock INTEGER,
     predicted_consumption NUMERIC(10,2),
-    confidence_lower NUMERIC(10,2),
-    confidence_upper NUMERIC(10,2),
+    confidence_lower INTEGER,
+    confidence_upper INTEGER,
     predicted_status stock_status,
     model_version VARCHAR(50),
     generated_at TIMESTAMPTZ DEFAULT now()
@@ -115,8 +115,8 @@ CREATE TABLE transfer_requests (
     id SERIAL PRIMARY KEY,
     requesting_facility_id INTEGER NOT NULL REFERENCES facilities(id),
     medicine_id INTEGER NOT NULL REFERENCES medicines(id),
-    quantity_requested NUMERIC(10,2) NOT NULL,
-    quantity_fulfilled NUMERIC(10,2) NOT NULL DEFAULT 0,   -- running total actually delivered so far
+    quantity_requested INTEGER NOT NULL,
+    quantity_fulfilled INTEGER NOT NULL DEFAULT 0,   -- running total actually delivered so far
     priority stock_status NOT NULL,                  -- critical / warning
     status transfer_status DEFAULT 'pending',
     current_escalation_level escalation_level DEFAULT 'peer_facility',
@@ -135,7 +135,7 @@ CREATE TABLE transfer_matches (
     id SERIAL PRIMARY KEY,
     transfer_request_id INTEGER NOT NULL REFERENCES transfer_requests(id) ON DELETE CASCADE,
     supplying_facility_id INTEGER NOT NULL REFERENCES facilities(id),
-    quantity_offered NUMERIC(10,2) NOT NULL,
+    quantity_offered INTEGER NOT NULL,
     distance_km NUMERIC(8,2),
     estimated_transit_minutes INTEGER,
     match_status VARCHAR(20) DEFAULT 'proposed',      -- proposed, accepted, rejected, delivered

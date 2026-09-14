@@ -26,8 +26,8 @@ class FacilityMedicineStatus(BaseModel):
     medicine_id: int
     medicine_name: str
     status: StockStatus
-    current_stock: float
-    capacity: Optional[float] = 100.0
+    current_stock: int
+    capacity: Optional[int] = 100
     avg_daily_consumption: Optional[float] = None
 
 
@@ -67,7 +67,7 @@ class InventoryItem(BaseModel):
     facility_name: str
     medicine_id: int
     medicine_name: str
-    current_stock: float
+    current_stock: int
     avg_daily_consumption: float
     status: StockStatus
     updated_at: datetime
@@ -90,9 +90,9 @@ class InventoryResponse(BaseModel):
 class ForecastDay(BaseModel):
     date: date
     predicted_consumption: float
-    predicted_stock: float
-    confidence_lower: float
-    confidence_upper: float
+    predicted_stock: int
+    confidence_lower: int
+    confidence_upper: int
     status: StockStatus
 
 
@@ -108,7 +108,7 @@ class ForecastResponse(BaseModel):
 # GET /forecast/suggested-quantity
 # =================================================================
 class SuggestedQuantityBasedOn(BaseModel):
-    current_stock: float
+    current_stock: int
     predicted_daily_consumption: float
     lead_time_days: int
 
@@ -116,7 +116,7 @@ class SuggestedQuantityBasedOn(BaseModel):
 class SuggestedQuantityResponse(BaseModel):
     facility_id: int
     medicine_id: int
-    suggested_quantity: float
+    suggested_quantity: int
     based_on: SuggestedQuantityBasedOn
 
 
@@ -128,7 +128,7 @@ class TransferRequestCreate(BaseModel):
     """POST /transfers request body."""
     requesting_facility_id: int
     medicine_id: int
-    quantity_requested: float
+    quantity_requested: int
     priority: StockStatus  # in practice always "critical" or "warning"
 
 
@@ -138,7 +138,7 @@ class TransferMatchOut(BaseModel):
     id: int
     supplying_facility_id: int
     supplying_facility_name: str
-    quantity_offered: float
+    quantity_offered: int
     distance_km: Optional[float] = None
     estimated_transit_minutes: Optional[int] = None
     match_status: Literal["proposed", "accepted", "rejected", "delivered"]
@@ -152,8 +152,8 @@ class TransferRequestOut(BaseModel):
     requesting_facility_name: Optional[str] = None
     medicine_id: int
     medicine_name: Optional[str] = None
-    quantity_requested: float
-    quantity_fulfilled: float
+    quantity_requested: int
+    quantity_fulfilled: int
     priority: StockStatus
     status: TransferStatus
     current_escalation_level: EscalationLevel
@@ -175,7 +175,7 @@ class TransferListResponse(BaseModel):
 class TransferRespondRequest(BaseModel):
     match_id: int
     action: Literal["accept", "reject"]
-    quantity_offered: Optional[float] = None
+    quantity_offered: Optional[int] = None
 
     @model_validator(mode="after")
     def _quantity_required_on_accept(self) -> "TransferRespondRequest":

@@ -632,7 +632,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                     <div key={m.medicine_id}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' }}>
                                             <span>{m.medicine_name.split(' ')[0]}</span>
-                                            <span style={{ color: getStatusColor(m.status), fontWeight: 700 }}>{m.current_stock}u</span>
+                                            <span style={{ color: getStatusColor(m.status), fontWeight: 700 }}>{Math.round(m.current_stock)}u</span>
                                         </div>
                                         <div style={{ width: '100%', height: '5px', backgroundColor: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
                                             <div style={{ width: `${fill}%`, height: '100%', backgroundColor: getStatusColor(m.status) }} />

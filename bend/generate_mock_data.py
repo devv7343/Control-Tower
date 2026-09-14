@@ -127,7 +127,7 @@ def simulate():
     for _, f in facilities_df.iterrows():
         for _, m in medicines_df.iterrows():
             state[(f["id"], m["id"])] = {
-                "stock": m["base_daily_mean"] * RNG.uniform(8, 15),
+                "stock": int(round(m["base_daily_mean"] * RNG.uniform(8, 15))),
                 "pending_deliveries": [],
             }
 
@@ -159,22 +159,22 @@ def simulate():
 
                 weekday_factor = 0.85 if current_date.weekday() >= 5 else 1.0
                 lam = max(0.1, m["base_daily_mean"] * size_factor * mult * weekday_factor)
-                consumption = float(RNG.poisson(lam))
+                consumption = int(RNG.poisson(lam))
                 consumption = min(consumption, s["stock"])
                 s["stock"] -= consumption
 
                 reorder_threshold = m["base_daily_mean"] * size_factor * m["lead_time_days"] * 1.5
                 if s["stock"] < reorder_threshold and not s["pending_deliveries"]:
-                    order_qty = m["base_daily_mean"] * size_factor * 14
+                    order_qty = int(round(m["base_daily_mean"] * size_factor * 14))
                     s["pending_deliveries"].append((day_idx + int(m["lead_time_days"]), order_qty))
 
                 logs.append({
                     "date": current_date.isoformat(),
                     "facility_id": f["id"],
                     "medicine_id": m["id"],
-                    "stock_level": round(s["stock"], 2),
-                    "consumption": round(consumption, 2),
-                    "replenishment_received": round(replenishment, 2),
+                    "stock_level": int(round(s["stock"])),
+                    "consumption": int(round(consumption)),
+                    "replenishment_received": int(round(replenishment)),
                 })
 
     logs_df = pd.DataFrame(logs)

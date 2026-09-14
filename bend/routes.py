@@ -31,14 +31,14 @@ def get_facilities(db: Session = Depends(get_db)):
         inv_rows = db.execute(select(FacilityInventory).where(FacilityInventory.facility_id == f.id)).scalars().all()
         medicines_list = []
         for inv in inv_rows:
-            med_capacity = (inv.reorder_point * 2) if inv.reorder_point else 150.0
+            med_capacity = int(round(inv.reorder_point * 2)) if inv.reorder_point else 150
             medicines_list.append(FacilityMedicineStatus(
                 medicine_id=inv.medicine.id,
                 medicine_name=inv.medicine.name,
                 status=inv.status or StockStatus.surplus,
-                current_stock=inv.current_stock,
+                current_stock=int(round(inv.current_stock)),
                 capacity=med_capacity,
-                avg_daily_consumption=inv.avg_daily_consumption
+                avg_daily_consumption=round(float(inv.avg_daily_consumption), 2) if inv.avg_daily_consumption is not None else None
             ))
             
         features.append(FacilityFeature(
@@ -92,8 +92,8 @@ def get_inventory(
             "facility_name": r.facility.name,
             "medicine_id": r.medicine.id,
             "medicine_name": r.medicine.name,
-            "current_stock": r.current_stock,
-            "avg_daily_consumption": r.avg_daily_consumption,
+            "current_stock": int(round(r.current_stock)),
+            "avg_daily_consumption": round(float(r.avg_daily_consumption), 2),
             "status": r.status or StockStatus.surplus,
             "updated_at": r.updated_at
         })
@@ -147,15 +147,15 @@ def get_suggested_quantity(
         raise HTTPException(status_code=400, detail=str(e))
         
     total_consumption = sum(f["predicted_consumption"] for f in forecasts)
-    suggested = max(0, total_consumption - inv.current_stock)
+    suggested = max(0, int(round(total_consumption - inv.current_stock)))
     
     return SuggestedQuantityResponse(
         facility_id=facility_id,
         medicine_id=medicine_id,
-        suggested_quantity=round(suggested, 2),
+        suggested_quantity=suggested,
         based_on={
-            "current_stock": inv.current_stock,
-            "predicted_daily_consumption": inv.avg_daily_consumption,
+            "current_stock": int(round(inv.current_stock)),
+            "predicted_daily_consumption": round(float(inv.avg_daily_consumption), 2),
             "lead_time_days": lead_time_days
         }
     )
@@ -210,7 +210,7 @@ def create_transfer(payload: TransferRequestCreate, db: Session = Depends(get_db
             match = TransferMatch(
                 transfer_request_id=req.id,
                 supplying_facility_id=cand["sourceId"],
-                quantity_offered=min(payload.quantity_requested, cand["availableStock"]),
+                quantity_offered=int(round(min(payload.quantity_requested, cand["availableStock"]))),
                 distance_km=cand["distance"],
                 estimated_transit_minutes=cand["transitMinutes"],
                 match_status="proposed"
@@ -225,7 +225,7 @@ def create_transfer(payload: TransferRequestCreate, db: Session = Depends(get_db
         req = TransferRequest(
             requesting_facility_id=payload.requesting_facility_id,
             medicine_id=payload.medicine_id,
-            quantity_requested=payload.quantity_requested,
+            quantity_requested=int(round(payload.quantity_requested)),
             priority=payload.priority,
             status=TransferStatus.pending,
             current_escalation_level=EscalationLevel.peer_facility if top_cand["tierScore"] == 1 else EscalationLevel.zonal_distributor,
@@ -238,7 +238,7 @@ def create_transfer(payload: TransferRequestCreate, db: Session = Depends(get_db
         match = TransferMatch(
             transfer_request_id=req.id,
             supplying_facility_id=top_cand["sourceId"],
-            quantity_offered=min(payload.quantity_requested, top_cand["availableStock"]),
+            quantity_offered=int(round(min(payload.quantity_requested, top_cand["availableStock"]))),
             distance_km=top_cand["distance"],
             estimated_transit_minutes=top_cand["transitMinutes"],
             match_status="proposed"
@@ -266,7 +266,7 @@ def respond_transfer(id: int, payload: TransferRespondRequest, db: Session = Dep
         
     if payload.action == "accept":
         match.match_status = "accepted"
-        offered = payload.quantity_offered
+        offered = int(round(payload.quantity_offered))
         match.quantity_offered = offered
         req.quantity_fulfilled += offered
         
@@ -276,7 +276,7 @@ def respond_transfer(id: int, payload: TransferRespondRequest, db: Session = Dep
         else:
             req.status = TransferStatus.in_transit
             # Create shortfall request
-            shortfall = req.quantity_requested - req.quantity_fulfilled
+            shortfall = int(round(req.quantity_requested - req.quantity_fulfilled))
             
             # Find next candidate
             used_ids = [m.supplying_facility_id for m in req.matches]
@@ -301,7 +301,7 @@ def respond_transfer(id: int, payload: TransferRespondRequest, db: Session = Dep
                 new_match = TransferMatch(
                     transfer_request_id=new_req.id,
                     supplying_facility_id=next_cand["sourceId"],
-                    quantity_offered=min(shortfall, next_cand["availableStock"]),
+                    quantity_offered=int(round(min(shortfall, next_cand["availableStock"]))),
                     distance_km=next_cand["distance"],
                     estimated_transit_minutes=next_cand["transitMinutes"],
                     match_status="proposed"
@@ -331,7 +331,7 @@ def respond_transfer(id: int, payload: TransferRespondRequest, db: Session = Dep
             new_match = TransferMatch(
                 transfer_request_id=req.id,
                 supplying_facility_id=next_cand["sourceId"],
-                quantity_offered=min(req.quantity_requested, next_cand["availableStock"]),
+                quantity_offered=int(round(min(req.quantity_requested, next_cand["availableStock"]))),
                 distance_km=next_cand["distance"],
                 estimated_transit_minutes=next_cand["transitMinutes"],
                 match_status="proposed"
@@ -371,8 +371,8 @@ def _format_transfer_response(req: TransferRequest):
         "requesting_facility_name": req.requesting_facility.name if req.requesting_facility else f"Facility #{req.requesting_facility_id}",
         "medicine_id": req.medicine_id,
         "medicine_name": req.medicine.name if req.medicine else f"Medicine #{req.medicine_id}",
-        "quantity_requested": req.quantity_requested,
-        "quantity_fulfilled": req.quantity_fulfilled,
+        "quantity_requested": int(round(req.quantity_requested)),
+        "quantity_fulfilled": int(round(req.quantity_fulfilled)),
         "priority": req.priority,
         "status": req.status,
         "current_escalation_level": req.current_escalation_level,
@@ -385,7 +385,7 @@ def _format_transfer_response(req: TransferRequest):
                 "id": m.id,
                 "supplying_facility_id": m.supplying_facility_id,
                 "supplying_facility_name": m.supplying_facility.name if m.supplying_facility else f"Facility #{m.supplying_facility_id}",
-                "quantity_offered": m.quantity_offered,
+                "quantity_offered": int(round(m.quantity_offered)),
                 "distance_km": m.distance_km,
                 "estimated_transit_minutes": m.estimated_transit_minutes,
                 "match_status": m.match_status

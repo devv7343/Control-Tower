@@ -34,7 +34,9 @@ export default function ForecastChart({ facilityId = 5, medicineId = 1, onMedici
                     const formattedData = res.forecast.map(day => ({
                         ...day,
                         displayDate: day.date.substring(5),
-                        confidenceRange: [day.confidence_lower, day.confidence_upper]
+                        predicted_stock: Math.round(day.predicted_stock),
+                        confidenceRange: [Math.round(day.confidence_lower), Math.round(day.confidence_upper)],
+                        predicted_consumption: Number(Number(day.predicted_consumption).toFixed(2))
                     }));
                     setChartData(formattedData);
                     setMetadata({
@@ -129,6 +131,15 @@ export default function ForecastChart({ facilityId = 5, medicineId = 1, onMedici
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0', fontSize: '12px', boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
                                 labelStyle={{ fontWeight: 700, color: '#0f172a', marginBottom: '4px' }}
+                                formatter={(value, name) => {
+                                    if (Array.isArray(value)) {
+                                        return [`[${Math.round(value[0])}, ${Math.round(value[1])}] units`, name];
+                                    }
+                                    if (String(name).toLowerCase().includes('consumption')) {
+                                        return [`${Number(value).toFixed(2)} units/day`, name];
+                                    }
+                                    return [`${Math.round(value)} units`, name];
+                                }}
                             />
                             <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '8px' }} />
 

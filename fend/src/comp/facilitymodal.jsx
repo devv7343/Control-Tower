@@ -235,9 +235,9 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                         </div>
 
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', color: '#64748b' }}>
-                                            <span>Stock: {med.current_stock} {med.capacity ? `/ ${med.capacity}` : ''}</span>
+                                            <span>Stock: {Math.round(med.current_stock)} {med.capacity ? `/ ${Math.round(med.capacity)}` : ''}</span>
                                             {med.avg_daily_consumption !== undefined && med.avg_daily_consumption !== null ? (
-                                                <span>Avg Daily: {med.avg_daily_consumption}/day</span>
+                                                <span>Avg Daily: {Number(med.avg_daily_consumption).toFixed(2)}/day</span>
                                             ) : (
                                                 <span>Status: {med.status}</span>
                                             )}
@@ -351,7 +351,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                                             </span>
                                                         </div>
                                                         <div style={{ fontSize: '11px', color: '#16a34a', marginTop: '3px' }}>
-                                                            Surplus Available: <strong>{cand.availableStock} units</strong> &bull; {cand.distance} km away
+                                                            Surplus Available: <strong>{Math.round(cand.availableStock)} units</strong> &bull; {cand.distance} km away
                                                         </div>
                                                     </div>
                                                     <div style={{ textAlign: 'right' }}>
