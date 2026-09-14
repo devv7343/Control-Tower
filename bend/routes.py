@@ -28,19 +28,38 @@ def get_facilities(db: Session = Depends(get_db)):
         if worst_status is None:
             worst_status = StockStatus.surplus
             
+        active_transfers = db.execute(
+            select(TransferRequest).where(
+                TransferRequest.requesting_facility_id == f.id,
+                TransferRequest.status == TransferStatus.in_transit
+            )
+        ).scalars().all()
+        in_transit_med_ids = {t.medicine_id for t in active_transfers}
+        
+        statuses = set()
         inv_rows = db.execute(select(FacilityInventory).where(FacilityInventory.facility_id == f.id)).scalars().all()
         medicines_list = []
         for inv in inv_rows:
             med_capacity = int(round(inv.reorder_point * 2)) if inv.reorder_point else 150
+            status = inv.status or StockStatus.surplus
+            if inv.medicine.id in in_transit_med_ids:
+                status = StockStatus.in_route
+            statuses.add(status)
             medicines_list.append(FacilityMedicineStatus(
                 medicine_id=inv.medicine.id,
                 medicine_name=inv.medicine.name,
-                status=inv.status or StockStatus.surplus,
+                status=status,
                 current_stock=int(round(inv.current_stock)),
                 capacity=med_capacity,
                 avg_daily_consumption=round(float(inv.avg_daily_consumption), 2) if inv.avg_daily_consumption is not None else None
             ))
             
+        from triage import _SEVERITY_ORDER
+        worst_status = StockStatus.surplus
+        for level in _SEVERITY_ORDER:
+            if level in statuses:
+                worst_status = level
+                break
         features.append(FacilityFeature(
             type="Feature",
             geometry=FacilityGeometry(type="Point", coordinates=(f.longitude, f.latitude)),
@@ -87,6 +106,17 @@ def get_inventory(
             
     items = []
     for r in filtered_rows:
+        status = r.status or StockStatus.surplus
+        active_transfer = db.execute(
+            select(TransferRequest).where(
+                TransferRequest.requesting_facility_id == r.facility_id,
+                TransferRequest.medicine_id == r.medicine_id,
+                TransferRequest.status == TransferStatus.in_transit
+            )
+        ).scalar_one_or_none()
+        if active_transfer:
+            status = StockStatus.in_route
+
         items.append({
             "facility_id": r.facility.id,
             "facility_name": r.facility.name,
@@ -94,7 +124,7 @@ def get_inventory(
             "medicine_name": r.medicine.name,
             "current_stock": int(round(r.current_stock)),
             "avg_daily_consumption": round(float(r.avg_daily_consumption), 2),
-            "status": r.status or StockStatus.surplus,
+            "status": status,
             "updated_at": r.updated_at
         })
         

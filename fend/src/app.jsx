@@ -58,7 +58,7 @@ export default function App() {
         <div style={{
             backgroundColor: 'var(--apple-bg)',
             minHeight: '100vh',
-            padding: '24px 32px',
+            padding: '24px 32px 64px 32px',
             boxSizing: 'border-box'
         }}>
             {/* Top Navigation Bar */}

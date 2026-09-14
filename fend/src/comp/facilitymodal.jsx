@@ -87,6 +87,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
     const getStatusColor = (status) => {
         if (status === 'critical') return '#ef4444';
         if (status === 'warning') return '#f59e0b';
+        if (status === 'in_route') return '#10b981';
         return '#22c55e';
     };
 
@@ -104,12 +105,16 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
             justifyContent: 'center',
             zIndex: 9999
         }}>
+            <style>{`
+                .hide-scrollbar::-webkit-scrollbar { display: none; }
+                .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             <div style={{
                 backgroundColor: '#ffffff',
                 width: '850px',
                 maxWidth: '94vw',
-                height: '560px',
-                maxHeight: '90vh',
+                height: '660px',
+                maxHeight: '95vh',
                 borderRadius: '16px',
                 boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)',
                 display: 'flex',
@@ -144,7 +149,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                             </span>
                         </div>
                         <p style={{ margin: '3px 0 0 0', fontSize: '12px', color: '#64748b' }}>
-                            Coordinates: [{facility.geometry.coordinates[1].toFixed(3)}, {facility.geometry.coordinates[0].toFixed(3)}] &bull; Overall Status: <strong style={{ color: getStatusColor(facility.worst_status) }}>{facility.worst_status}</strong>
+                            Coordinates: [{facility.geometry.coordinates[1].toFixed(3)}, {facility.geometry.coordinates[0].toFixed(3)}] &bull; Overall Status: <strong style={{ color: getStatusColor(facility.worst_status), textTransform: 'capitalize' }}>{facility.worst_status === 'in_route' ? 'In Route' : facility.worst_status}</strong>
                         </p>
                     </div>
                     <button
@@ -170,7 +175,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                 {/* Modal Body */}
                 <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
                     {/* Left Column: Inventory List */}
-                    <div style={{ flex: '1 1 50%', borderRight: '1px solid #e2e8f0', padding: '20px', overflowY: 'auto' }}>
+                    <div className="hide-scrollbar" style={{ flex: '1 1 50%', borderRight: '1px solid #e2e8f0', padding: '20px', overflowY: 'auto' }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
                             <h3 style={{ margin: 0, fontSize: '14px', fontWeight: 600, color: '#334155' }}>
                                 Live Facility Inventory
@@ -205,12 +210,12 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                                 <span style={{
                                                     fontSize: '11px',
                                                     fontWeight: 600,
-                                                    color: med.status === 'critical' ? '#dc2626' : '#d97706',
-                                                    backgroundColor: med.status === 'critical' ? '#fee2e2' : '#fef3c7',
+                                                    color: med.status === 'critical' ? '#dc2626' : (med.status === 'in_route' ? '#047857' : '#d97706'),
+                                                    backgroundColor: med.status === 'critical' ? '#fee2e2' : (med.status === 'in_route' ? '#d1fae5' : '#fef3c7'),
                                                     padding: '2px 6px',
                                                     borderRadius: '6px'
                                                 }}>
-                                                    {neededUnits} needed
+                                                    {med.status === 'in_route' ? 'In Route' : `${neededUnits} needed`}
                                                 </span>
                                             ) : (
                                                 <span style={{ fontSize: '11px', color: '#16a34a', fontWeight: 600 }}>Surplus OK</span>
@@ -239,7 +244,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                             {med.avg_daily_consumption !== undefined && med.avg_daily_consumption !== null ? (
                                                 <span>Avg Daily: {Number(med.avg_daily_consumption).toFixed(2)}/day</span>
                                             ) : (
-                                                <span>Status: {med.status}</span>
+                                                <span style={{ textTransform: 'capitalize' }}>Status: {med.status === 'in_route' ? 'In Route' : med.status}</span>
                                             )}
                                         </div>
                                     </div>
@@ -254,18 +259,21 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                             Optimized Supply Route Suggestions
                         </h3>
 
-                        {message && (
-                            <div style={{
-                                padding: '10px 14px',
-                                borderRadius: '8px',
-                                fontSize: '12px',
-                                marginBottom: '10px',
-                                backgroundColor: message.type === 'success' ? '#dcfce7' : '#fee2e2',
-                                color: message.type === 'success' ? '#15803d' : '#b91c1c'
-                            }}>
-                                {message.text}
-                            </div>
-                        )}
+                        {/* Reserved space for messages to prevent layout shift and scrollbars */}
+                        <div style={{ minHeight: '40px', marginBottom: '8px' }}>
+                            {message && (
+                                <div style={{
+                                    padding: '10px 14px',
+                                    borderRadius: '8px',
+                                    fontSize: '12px',
+                                    backgroundColor: message.type === 'success' ? '#dcfce7' : '#fee2e2',
+                                    color: message.type === 'success' ? '#15803d' : '#b91c1c',
+                                    animation: 'fadeIn 0.2s ease-in'
+                                }}>
+                                    {message.text}
+                                </div>
+                            )}
+                        </div>
 
                         {!selectedMed ? (
                             <div style={{
@@ -308,7 +316,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                     Suppliers with verified surplus for <strong>{selectedMed.medicine_name}</strong>:
                                 </p>
 
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto', marginBottom: '14px' }}>
+                                <div className="hide-scrollbar" style={{ display: 'flex', flexDirection: 'column', gap: '8px', flex: 1, overflowY: 'auto', marginBottom: '14px' }}>
                                     {isLoadingCandidates ? (
                                         <div style={{ textAlign: 'center', padding: '24px', color: '#64748b', fontSize: '13px' }}>
                                             Checking network surplus &amp; optimal routes...
@@ -328,7 +336,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                                         backgroundColor: isSelected ? '#f0fdf4' : '#ffffff',
                                                         border: isSelected ? '2px solid #16a34a' : '1px solid #e2e8f0',
                                                         borderRadius: '10px',
-                                                        padding: '12px 14px',
+                                                        padding: '10px 12px',
                                                         cursor: 'pointer',
                                                         display: 'flex',
                                                         justifyContent: 'space-between',

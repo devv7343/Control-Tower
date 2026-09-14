@@ -61,8 +61,11 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
         const r = canvasRef.current.getBoundingClientRect();
         let x = e.clientX - r.left + 15;
         let y = e.clientY - r.top + 15;
-        if (x + 280 > r.width) {
-            x = e.clientX - r.left - 295;
+        if (x + 240 > r.width) {
+            x = e.clientX - r.left - 240;
+        }
+        if (y + 180 > r.height) {
+            y = e.clientY - r.top - 180;
         }
         setTooltipPos({ x, y });
         setHoveredFacility(f);
@@ -80,6 +83,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
     const getStatusColor = (status) => {
         if (status === 'critical') return '#ef4444';
         if (status === 'warning') return '#f59e0b';
+        if (status === 'in_route') return '#10b981';
         return '#22c55e';
     };
 
@@ -321,6 +325,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                     pointerEvents="stroke"
                                 />
                                 <path
+                                    id={`route-path-${route.transferId}-${idx}`}
                                     d={pathData}
                                     fill="none"
                                     stroke={isTransit ? 'rgba(37, 99, 235, 0.2)' : 'rgba(245, 158, 11, 0.2)'}
@@ -334,6 +339,13 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                     markerEnd={isTransit ? 'url(#topo-arrow-blue)' : 'url(#topo-arrow-amber)'}
                                     pointerEvents="none"
                                 />
+                                {isTransit && (
+                                    <polygon points="0,-6 12,0 0,6" fill="#1d4ed8">
+                                        <animateMotion dur="2s" repeatCount="indefinite" rotate="auto">
+                                            <mpath href={`#route-path-${route.transferId}-${idx}`} />
+                                        </animateMotion>
+                                    </polygon>
+                                )}
                             </g>
                         );
                     })}
@@ -474,7 +486,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                             borderRadius: '50%',
                                             backgroundColor: getStatusColor(h.properties.worst_status)
                                         }} />
-                                        <span>Status: <strong style={{ color: getStatusColor(h.properties.worst_status) }}>{h.properties.worst_status}</strong></span>
+                                        <span>Status: <strong style={{ color: getStatusColor(h.properties.worst_status), textTransform: 'capitalize' }}>{h.properties.worst_status === 'in_route' ? 'In Route' : h.properties.worst_status}</strong></span>
                                     </div>
                                 </div>
                             </div>
@@ -579,7 +591,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                                             textTransform: 'uppercase',
                                                             color: getStatusColor(worst)
                                                         }}>
-                                                            {worst}
+                                                            {worst === 'in_route' ? 'IN ROUTE' : worst}
                                                         </span>
                                                         <span style={{
                                                             width: '8px',

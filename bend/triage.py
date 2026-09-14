@@ -25,7 +25,7 @@ from models import FacilityInventory, Medicine, StockStatus
 # classify_status() itself never produces it (it only returns critical /
 # warning / surplus) — if a stockout ever gets set some other way later,
 # worst-status ranking should still treat it as more severe than critical.
-_SEVERITY_ORDER = [StockStatus.stockout, StockStatus.critical, StockStatus.warning, StockStatus.surplus]
+_SEVERITY_ORDER = [StockStatus.stockout, StockStatus.critical, StockStatus.warning, StockStatus.in_route, StockStatus.surplus]
 
 
 def compute_status(current_stock: float, avg_daily_consumption: float, lead_time_days: int) -> StockStatus:

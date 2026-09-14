@@ -180,7 +180,7 @@ def classify_status(current_stock: float, predicted_daily_consumption: float,
     days_remaining = current_stock / predicted_daily_consumption
     if days_remaining <= lead_time_days * critical_multiplier:
         return "critical"
-    elif days_remaining <= lead_time_days * warning_multiplier:
+    elif days_remaining <= 10 or days_remaining <= lead_time_days * warning_multiplier:
         return "warning"
     return "surplus"
 

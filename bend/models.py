@@ -48,6 +48,7 @@ class StockStatus(str, enum.Enum):
     warning = "warning"
     critical = "critical"
     stockout = "stockout"
+    in_route = "in_route"
 
 
 class TransferStatus(str, enum.Enum):
