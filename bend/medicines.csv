@@ -1,0 +1,6 @@
+id,name,category,unit,base_daily_mean,lead_time_days
+1,ORS Sachets,rehydration,sachets,15,3
+2,Amoxicillin 500mg,antibiotic,tablets,10,5
+3,Paracetamol 500mg,analgesic,tablets,25,2
+4,IV Fluids (Normal Saline),fluids,bottles,8,4
+5,Antiviral (Oseltamivir),antiviral,capsules,5,7
