@@ -9,10 +9,10 @@ start "Control Tower - Backend" cmd /k "cd /d %~dp0bend && echo Starting FastAPI
 :: Start React Frontend
 start "Control Tower - Frontend" cmd /k "cd /d %~dp0fend && echo Starting React frontend... && npm run dev"
 
-echo Waiting 3 seconds for servers to initialize...
-timeout /t 3 >nul
+echo Waiting 5 seconds for servers to initialize...
+timeout /t 5 >nul
 
 echo Opening application in default web browser...
-start http://localhost:5173
+start http://127.0.0.1:5173
 
 echo Control Tower is now running.

@@ -11,13 +11,18 @@ and installing psycopg2-binary — nothing else here needs to change.
 """
 
 import os
+import sys
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 
 load_dotenv()
 
-DB_DIR = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    DB_DIR = os.path.dirname(sys.executable)
+else:
+    DB_DIR = os.path.dirname(os.path.abspath(__file__))
+
 DEFAULT_DB_PATH = os.path.join(DB_DIR, "control_tower.db").replace("\\", "/")
 DATABASE_URL = os.getenv("DATABASE_URL", f"sqlite:///{DEFAULT_DB_PATH}")
 

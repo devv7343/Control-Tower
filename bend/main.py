@@ -28,8 +28,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(router)
+import sys
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 
+app.include_router(router, prefix="/api")
+
+if hasattr(sys, '_MEIPASS'):
+    dist_dir = os.path.join(sys._MEIPASS, 'fend', 'dist')
+    base_dir = sys._MEIPASS
+else:
+    dist_dir = os.path.join(os.path.dirname(__file__), '..', 'fend', 'dist')
+    base_dir = os.path.dirname(__file__)
+
+if os.path.exists(dist_dir):
+    app.mount("/", StaticFiles(directory=dist_dir, html=True), name="static")
 @app.on_event("startup")
 def on_startup():
     """
@@ -142,3 +155,17 @@ def on_startup():
             db.commit()
     finally:
         db.close()
+
+if __name__ == "__main__":
+    import uvicorn
+    # Open browser automatically
+    import threading
+    import webbrowser
+    import time
+    
+    def open_browser():
+        time.sleep(2)
+        webbrowser.open("http://127.0.0.1:8000")
+        
+    threading.Thread(target=open_browser, daemon=True).start()
+    uvicorn.run(app, host="127.0.0.1", port=8000)

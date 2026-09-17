@@ -3,7 +3,7 @@
  * Connects strictly to the API Contract defined backend
  */
 
-const BASE_URL = 'http://localhost:8000';
+const BASE_URL = '/api';
 
 const updateListeners = new Set();
 
