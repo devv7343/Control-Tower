@@ -33,12 +33,13 @@ CRITICAL_FACILITY_IDS = [10] # Add facility IDs here to make them critical
 FORCE_OVERRIDE_STATUS = True
 
 
-def compute_status(facility_id: int, current_stock: float, avg_daily_consumption: float, lead_time_days: int) -> StockStatus:
+def compute_status(facility_id: int, medicine_id: int, current_stock: float, avg_daily_consumption: float, lead_time_days: int) -> StockStatus:
     """
     Converts the raw status string from the forecast model into a StockStatus enum.
     
     Args:
         facility_id (int): The ID of the facility.
+        medicine_id (int): The ID of the medicine.
         current_stock (float): The current amount of stock available.
         avg_daily_consumption (float): The average amount of stock consumed per day.
         lead_time_days (int): The number of days it takes to restock this item.
@@ -47,7 +48,7 @@ def compute_status(facility_id: int, current_stock: float, avg_daily_consumption
         StockStatus: The classified stock status.
     """
     if FORCE_OVERRIDE_STATUS:
-        if facility_id in CRITICAL_FACILITY_IDS:
+        if facility_id in [5, 8, 11, 14] and medicine_id in [1, 2, 3]:
             return StockStatus.critical
         return StockStatus.surplus
 
@@ -81,7 +82,7 @@ def refresh_facility_medicine_status(
 
     medicine = db.get(Medicine, medicine_id)
     inventory.status = compute_status(
-        facility_id, inventory.current_stock, inventory.avg_daily_consumption, medicine.standard_lead_time_days
+        facility_id, medicine_id, inventory.current_stock, inventory.avg_daily_consumption, medicine.standard_lead_time_days
     )
     db.commit()
     db.refresh(inventory)
@@ -107,7 +108,7 @@ def refresh_all_statuses(db: Session) -> int:
         if medicine is None:
             continue  # orphaned row pointing at a medicine that no longer exists
         row.status = compute_status(
-            row.facility_id, row.current_stock, row.avg_daily_consumption, medicine.standard_lead_time_days
+            row.facility_id, row.medicine_id, row.current_stock, row.avg_daily_consumption, medicine.standard_lead_time_days
         )
         updated_count += 1
 
