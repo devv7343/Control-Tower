@@ -63,7 +63,7 @@ export const getFacilities = async () => {
  * @returns {Promise<Object>} Inventory summary and item list.
  */
 export const getInventory = async (params = {}) => {
-    const url = new URL(`${BASE_URL}/inventory`);
+    const url = new URL(`${BASE_URL}/inventory`, window.location.origin);
     Object.keys(params).forEach(key => {
         if (params[key]) {
             url.searchParams.append(key, params[key]);
@@ -116,7 +116,7 @@ export const findSupplyCandidates = getCandidates;
  * @returns {Promise<Object>} List of transfers.
  */
 export const getTransfers = async (params = {}) => {
-    const url = new URL(`${BASE_URL}/transfers`);
+    const url = new URL(`${BASE_URL}/transfers`, window.location.origin);
     Object.keys(params).forEach(key => {
         if (params[key]) {
             url.searchParams.append(key, params[key]);
