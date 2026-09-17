@@ -237,18 +237,12 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                 priority: selectedMedicine.status === 'critical' ? 'critical' : 'warning'
             });
 
-            // If a match is proposed, immediately accept it to establish the route
-            if (transfer.matches && transfer.matches.length > 0) {
-                const matchId = transfer.matches[0].id;
-                await respondToTransfer(transfer.id, matchId, 'accept', transfer.matches[0].quantity_offered);
-            }
-
-            setMessage({ type: 'success', text: `Route dispatched from ${selectedCandidate.sourceName}! Supply is now In Transit.` });
+            setMessage({ type: 'success', text: `Supply request created! It is now pending approval in the Manage Transfers tab.` });
             if (onTransferRouted) onTransferRouted();
 
             setTimeout(() => {
                 onClose();
-            }, 1200);
+            }, 2000);
         } catch (error) {
             setMessage({ type: 'error', text: 'Failed to dispatch route: ' + error.message });
         } finally {
@@ -436,7 +430,7 @@ export default function FacilityModal({ facility, onClose, onTransferRouted }) {
                                     disabled={!selectedCandidate || isRouting}
                                     style={STYLES.routeButton(!selectedCandidate || isRouting)}
                                 >
-                                    {isRouting ? 'Dispatching Route...' : selectedCandidate ? `Accept & Route Supply from ${selectedCandidate.sourceName}` : 'Select a Supplier to Route'}
+                                    {isRouting ? 'Requesting...' : selectedCandidate ? `Request Supply from ${selectedCandidate.sourceName}` : 'Select a Supplier'}
                                 </button>
                             </div>
                         )}
