@@ -407,9 +407,15 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                     markerEnd={isTransit ? 'url(#topo-arrow-blue)' : 'url(#topo-arrow-amber)'}
                                     pointerEvents="none"
                                 />
-                                {isTransit && (
+                                {isTransit ? (
                                     <polygon points="0,-6 12,0 0,6" fill="#1d4ed8">
                                         <animateMotion dur="2s" repeatCount="indefinite" rotate="auto">
+                                            <mpath href={`#route-path-${route.transferId}-${index}`} />
+                                        </animateMotion>
+                                    </polygon>
+                                ) : (
+                                    <polygon points="0,-5 10,0 0,5" fill="#f59e0b">
+                                        <animateMotion dur="3.5s" repeatCount="indefinite" rotate="auto">
                                             <mpath href={`#route-path-${route.transferId}-${index}`} />
                                         </animateMotion>
                                     </polygon>

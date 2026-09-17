@@ -132,31 +132,36 @@ def get_inventory(
         query = query.where(FacilityInventory.status == status)
         
     all_inventory = db.execute(select(FacilityInventory)).scalars().all()
-    filtered_inventory = db.execute(query).scalars().all()
+    
+    # Pre-fetch all active transfers to avoid N+1 queries
+    active_transfers = db.execute(
+        select(TransferRequest).where(TransferRequest.status == TransferStatus.in_transit)
+    ).scalars().all()
+    in_transit_keys = {(t.requesting_facility_id, t.medicine_id) for t in active_transfers}
     
     summary = {"critical": 0, "warning": 0, "surplus": 0}
+    items = []
+    
     for record in all_inventory:
-        if record.status in (StockStatus.critical, StockStatus.stockout):
+        effective_status = record.status or StockStatus.surplus
+        if (record.facility_id, record.medicine_id) in in_transit_keys:
+            effective_status = StockStatus.in_route
+            
+        if effective_status in (StockStatus.critical, StockStatus.stockout):
             summary["critical"] += 1
-        elif record.status == StockStatus.warning:
+        elif effective_status == StockStatus.warning:
             summary["warning"] += 1
         else:
             summary["surplus"] += 1
             
-    items = []
-    for record in filtered_inventory:
-        current_status = record.status or StockStatus.surplus
-        active_transfer = db.execute(
-            select(TransferRequest).where(
-                TransferRequest.requesting_facility_id == record.facility_id,
-                TransferRequest.medicine_id == record.medicine_id,
-                TransferRequest.status == TransferStatus.in_transit
-            )
-        ).scalars().first()
-        
-        if active_transfer:
-            current_status = StockStatus.in_route
-
+        # Apply filters in Python to ensure effective_status is respected
+        if facility_id is not None and record.facility_id != facility_id:
+            continue
+        if medicine_id is not None and record.medicine_id != medicine_id:
+            continue
+        if status is not None and effective_status != status:
+            continue
+            
         items.append({
             "facility_id": record.facility.id,
             "facility_name": record.facility.name,
@@ -164,7 +169,7 @@ def get_inventory(
             "medicine_name": record.medicine.name,
             "current_stock": int(round(record.current_stock)),
             "avg_daily_consumption": round(float(record.avg_daily_consumption), 2),
-            "status": current_status,
+            "status": effective_status,
             "updated_at": record.updated_at
         })
         
