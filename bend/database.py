@@ -1,11 +1,13 @@
 """
 Control Tower — Database Engine & Session
 ==========================================
-SQLite for this prototype. schema.sql (Postgres + PostGIS) stays as the
-documented target design; models.py is the actual source of truth for what
-gets created against SQLite for the demo. Switching to real Postgres later
-just means changing DATABASE_URL below and installing psycopg2-binary —
-nothing else here needs to change.
+Provides the core database connection and session management setup.
+This prototype uses SQLite by default. `schema.sql` (Postgres + PostGIS) 
+stays as the documented target design; `models.py` is the actual source of truth 
+for what gets created against SQLite for the demo. 
+
+Switching to real Postgres later just means changing the DATABASE_URL below 
+and installing psycopg2-binary — nothing else here needs to change.
 """
 
 import os
@@ -43,25 +45,36 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 
 class Base(DeclarativeBase):
-    """Every table in models.py inherits from this."""
+    """
+    Every table in models.py inherits from this DeclarativeBase.
+    This acts as the registry for all our SQLAlchemy models.
+    """
     pass
 
 
-def get_db():
-    """FastAPI dependency: yields one session per request, always closed
-    afterward even if the request raises."""
-    db = SessionLocal()
+from typing import Generator
+from sqlalchemy.orm import Session
+
+def get_db() -> Generator[Session, None, None]:
+    """
+    FastAPI dependency: yields one session per request.
+    Ensures that the session is always closed afterward, even if the request raises an exception.
+    """
+    database_session = SessionLocal()
     try:
-        yield db
+        yield database_session
     finally:
-        db.close()
+        database_session.close()
 
 
 def init_db():
-    """Creates all tables from models.py's Base metadata. No migrations for
-    this prototype — call this once at startup (main.py will do this), or
-    run `python -c "from database import init_db; init_db()"` to rebuild
-    control_tower.db from scratch after a schema change."""
+    """
+    Creates all tables from models.py's Base metadata. 
+    
+    No migrations are used for this prototype — call this once at startup 
+    (main.py will do this), or run `python -c "from database import init_db; init_db()"` 
+    to rebuild control_tower.db from scratch after a schema change.
+    """
     import models  # noqa: F401 — importing this registers every table class
     # onto Base.metadata before create_all() runs below. Local import, not
     # top-of-file, specifically to avoid a circular import: models.py itself

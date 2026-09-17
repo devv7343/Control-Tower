@@ -48,45 +48,48 @@ OUTBREAK = {
     "max_multiplier": 6.0,       # peak consumption = 6x baseline at the epicenter
 }
 
-def haversine_km(lat1, lon1, lat2, lon2):
-    R = 6371.0
+def haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Calculates the distance in kilometers between two geographic coordinates."""
+    earth_radius = 6371.0
     p1, p2 = math.radians(lat1), math.radians(lat2)
     dphi = math.radians(lat2 - lat1)
     dlambda = math.radians(lon2 - lon1)
     a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dlambda / 2) ** 2
-    return 2 * R * math.asin(math.sqrt(a))
+    return 2 * earth_radius * math.asin(math.sqrt(a))
 
-def random_point_near(center, radius_km):
-    r = radius_km * math.sqrt(RNG.random())
+def random_point_near(center: tuple, radius_km: float) -> tuple:
+    """Generates a random (latitude, longitude) point within a given radius from a center."""
+    radius = radius_km * math.sqrt(RNG.random())
     theta = RNG.random() * 2 * math.pi
-    dlat = (r / 111.0) * math.cos(theta)
-    dlon = (r / (111.0 * math.cos(math.radians(center[0])))) * math.sin(theta)
+    dlat = (radius / 111.0) * math.cos(theta)
+    dlon = (radius / (111.0 * math.cos(math.radians(center[0])))) * math.sin(theta)
     return center[0] + dlat, center[1] + dlon
 
-def generate_facilities():
+def generate_facilities() -> pd.DataFrame:
+    """Creates a realistic hierarchical network of distributors, hospitals, and clinics."""
     rows = []
-    fid = 1
+    facility_id_counter = 1
     
     # 1 Distributor
-    distributor_id = fid
+    distributor_id = facility_id_counter
     lat, lon = CITY_CENTER
     rows.append({
         "id": distributor_id, "name": "Central Zonal Distributor", "type": "distributor",
         "lat": lat, "lon": lon, "capacity": 15000, "parent_facility_id": None
     })
-    fid += 1
+    facility_id_counter += 1
     
     # 3 Hospitals
     hospital_ids = []
-    h_names = ["Hospital Alpha (Central)", "Hospital Beta (West)", "Hospital Gamma (East)"]
-    for name in h_names:
+    hospital_names = ["Hospital Alpha (Central)", "Hospital Beta (West)", "Hospital Gamma (East)"]
+    for name in hospital_names:
         lat, lon = random_point_near(CITY_CENTER, BOUNDING_RADIUS_KM * 0.5)
         rows.append({
-            "id": fid, "name": name, "type": "hospital",
+            "id": facility_id_counter, "name": name, "type": "hospital",
             "lat": lat, "lon": lon, "capacity": 2000, "parent_facility_id": distributor_id
         })
-        hospital_ids.append(fid)
-        fid += 1
+        hospital_ids.append(facility_id_counter)
+        facility_id_counter += 1
         
     # 4 Clinics per hospital
     for h_id in hospital_ids:
@@ -94,14 +97,15 @@ def generate_facilities():
             parent = next(row for row in rows if row["id"] == h_id)
             lat, lon = random_point_near((parent["lat"], parent["lon"]), BOUNDING_RADIUS_KM * 0.3)
             rows.append({
-                "id": fid, "name": f"Clinic {parent['name'].split()[1]} {c}", "type": "clinic",
+                "id": facility_id_counter, "name": f"Clinic {parent['name'].split()[1]} {c}", "type": "clinic",
                 "lat": lat, "lon": lon, "capacity": 500, "parent_facility_id": h_id
             })
-            fid += 1
+            facility_id_counter += 1
 
     return pd.DataFrame(rows)
 
-def outbreak_multiplier(day_index, distance_km):
+def outbreak_multiplier(day_index: int, distance_km: float) -> float:
+    """Calculates a demand multiplier based on outbreak progression and geographical proximity."""
     if day_index < OUTBREAK["start_day"] or distance_km > OUTBREAK["radius_km"]:
         return 1.0
     days_since = day_index - OUTBREAK["start_day"]
@@ -119,15 +123,16 @@ def outbreak_multiplier(day_index, distance_km):
     return 1 + (OUTBREAK["max_multiplier"] - 1) * growth * decay * distance_factor
 
 def simulate():
+    """Runs the full simulation over SIM_DAYS and builds inventory logs."""
     facilities_df = generate_facilities()
     medicines_df = pd.DataFrame(MEDICINES).reset_index().rename(columns={"index": "med_idx"})
     medicines_df["id"] = medicines_df["med_idx"] + 1
 
     state = {}
-    for _, f in facilities_df.iterrows():
-        for _, m in medicines_df.iterrows():
-            state[(f["id"], m["id"])] = {
-                "stock": int(round(m["base_daily_mean"] * RNG.uniform(8, 15))),
+    for _, facility_row in facilities_df.iterrows():
+        for _, medicine_row in medicines_df.iterrows():
+            state[(facility_row["id"], medicine_row["id"])] = {
+                "stock": int(round(medicine_row["base_daily_mean"] * RNG.uniform(8, 15))),
                 "pending_deliveries": [],
             }
 
@@ -135,44 +140,44 @@ def simulate():
     for day_idx in range(SIM_DAYS):
         current_date = START_DATE + timedelta(days=day_idx)
 
-        for _, f in facilities_df.iterrows():
-            if f["type"] == "distributor":
+        for _, facility_row in facilities_df.iterrows():
+            if facility_row["type"] == "distributor":
                 continue
 
-            distance_to_epicenter = haversine_km(f["lat"], f["lon"], *OUTBREAK["epicenter"])
-            size_factor = {"clinic": 1.0, "hospital": 3.0}.get(f["type"], 1.0)
+            distance_to_epicenter = haversine_km(facility_row["lat"], facility_row["lon"], *OUTBREAK["epicenter"])
+            size_factor = {"clinic": 1.0, "hospital": 3.0}.get(facility_row["type"], 1.0)
 
-            for _, m in medicines_df.iterrows():
-                key = (f["id"], m["id"])
-                s = state[key]
+            for _, medicine_row in medicines_df.iterrows():
+                key = (facility_row["id"], medicine_row["id"])
+                stock_state = state[key]
 
-                arrived = [q for (day, q) in s["pending_deliveries"] if day == day_idx]
+                arrived = [quantity for (day, quantity) in stock_state["pending_deliveries"] if day == day_idx]
                 replenishment = sum(arrived)
-                s["pending_deliveries"] = [(d, q) for (d, q) in s["pending_deliveries"] if d != day_idx]
-                s["stock"] += replenishment
+                stock_state["pending_deliveries"] = [(d, q) for (d, q) in stock_state["pending_deliveries"] if d != day_idx]
+                stock_state["stock"] += replenishment
 
-                mult = 1.0
-                if m["name"] == OUTBREAK["medicine"]:
-                    mult = outbreak_multiplier(day_idx, distance_to_epicenter)
-                elif m["name"] in OUTBREAK["secondary_medicines"]:
-                    mult = 1 + (outbreak_multiplier(day_idx, distance_to_epicenter) - 1) * 0.5
+                multiplier = 1.0
+                if medicine_row["name"] == OUTBREAK["medicine"]:
+                    multiplier = outbreak_multiplier(day_idx, distance_to_epicenter)
+                elif medicine_row["name"] in OUTBREAK["secondary_medicines"]:
+                    multiplier = 1 + (outbreak_multiplier(day_idx, distance_to_epicenter) - 1) * 0.5
 
                 weekday_factor = 0.85 if current_date.weekday() >= 5 else 1.0
-                lam = max(0.1, m["base_daily_mean"] * size_factor * mult * weekday_factor)
-                consumption = int(RNG.poisson(lam))
-                consumption = min(consumption, s["stock"])
-                s["stock"] -= consumption
+                lambda_param = max(0.1, medicine_row["base_daily_mean"] * size_factor * multiplier * weekday_factor)
+                consumption = int(RNG.poisson(lambda_param))
+                consumption = min(consumption, stock_state["stock"])
+                stock_state["stock"] -= consumption
 
-                reorder_threshold = m["base_daily_mean"] * size_factor * m["lead_time_days"] * 1.5
-                if s["stock"] < reorder_threshold and not s["pending_deliveries"]:
-                    order_qty = int(round(m["base_daily_mean"] * size_factor * 14))
-                    s["pending_deliveries"].append((day_idx + int(m["lead_time_days"]), order_qty))
+                reorder_threshold = medicine_row["base_daily_mean"] * size_factor * medicine_row["lead_time_days"] * 1.5
+                if stock_state["stock"] < reorder_threshold and not stock_state["pending_deliveries"]:
+                    order_qty = int(round(medicine_row["base_daily_mean"] * size_factor * 14))
+                    stock_state["pending_deliveries"].append((day_idx + int(medicine_row["lead_time_days"]), order_qty))
 
                 logs.append({
                     "date": current_date.isoformat(),
-                    "facility_id": f["id"],
-                    "medicine_id": m["id"],
-                    "stock_level": int(round(s["stock"])),
+                    "facility_id": facility_row["id"],
+                    "medicine_id": medicine_row["id"],
+                    "stock_level": int(round(stock_state["stock"])),
                     "consumption": int(round(consumption)),
                     "replenishment_received": int(round(replenishment)),
                 })

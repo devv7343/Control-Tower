@@ -29,9 +29,17 @@ _SEVERITY_ORDER = [StockStatus.stockout, StockStatus.critical, StockStatus.warni
 
 
 def compute_status(current_stock: float, avg_daily_consumption: float, lead_time_days: int) -> StockStatus:
-    """classify_status() returns a plain lowercase string; this converts it
-    to the StockStatus enum so the rest of the backend deals with one
-    consistent type instead of raw strings floating around."""
+    """
+    Converts the raw status string from the forecast model into a StockStatus enum.
+    
+    Args:
+        current_stock (float): The current amount of stock available.
+        avg_daily_consumption (float): The average amount of stock consumed per day.
+        lead_time_days (int): The number of days it takes to restock this item.
+        
+    Returns:
+        StockStatus: The classified stock status.
+    """
     status_str = classify_status(current_stock, avg_daily_consumption, lead_time_days)
     return StockStatus(status_str)
 
@@ -39,15 +47,24 @@ def compute_status(current_stock: float, avg_daily_consumption: float, lead_time
 def refresh_facility_medicine_status(
     db: Session, facility_id: int, medicine_id: int
 ) -> Optional[FacilityInventory]:
-    """Recomputes and saves .status for one (facility, medicine) row, using
-    that medicine's standard_lead_time_days. Returns the updated row, or
-    None if no facility_inventory row exists yet for this pair."""
+    """
+    Recomputes and saves the status for a specific facility's medicine inventory.
+    
+    Args:
+        db (Session): The database session.
+        facility_id (int): The ID of the facility.
+        medicine_id (int): The ID of the medicine.
+        
+    Returns:
+        Optional[FacilityInventory]: The updated inventory row, or None if the record does not exist.
+    """
     inventory = db.execute(
         select(FacilityInventory).where(
             FacilityInventory.facility_id == facility_id,
             FacilityInventory.medicine_id == medicine_id,
         )
     ).scalar_one_or_none()
+    
     if inventory is None:
         return None
 
@@ -61,30 +78,45 @@ def refresh_facility_medicine_status(
 
 
 def refresh_all_statuses(db: Session) -> int:
-    """Recomputes .status for every facility_inventory row in one pass.
-    Returns the number of rows updated."""
-    rows = db.execute(select(FacilityInventory)).scalars().all()
-    medicines_by_id = {m.id: m for m in db.execute(select(Medicine)).scalars().all()}
+    """
+    Recomputes the status for every facility_inventory row in the database.
+    
+    Args:
+        db (Session): The database session.
+        
+    Returns:
+        int: The number of inventory records that were updated.
+    """
+    inventory_rows = db.execute(select(FacilityInventory)).scalars().all()
+    medicines_by_id = {medicine.id: medicine for medicine in db.execute(select(Medicine)).scalars().all()}
 
-    updated = 0
-    for row in rows:
+    updated_count = 0
+    for row in inventory_rows:
         medicine = medicines_by_id.get(row.medicine_id)
         if medicine is None:
             continue  # orphaned row pointing at a medicine that no longer exists
         row.status = compute_status(
             row.current_stock, row.avg_daily_consumption, medicine.standard_lead_time_days
         )
-        updated += 1
+        updated_count += 1
 
     db.commit()
-    return updated
+    return updated_count
 
 
 def get_facility_worst_status(db: Session, facility_id: int) -> Optional[StockStatus]:
-    """The single most severe status across all of a facility's medicines —
-    this is what GET /facilities uses to color one map pin per facility,
-    since a pin can only be one color. Returns None if the facility has no
-    inventory rows at all yet."""
+    """
+    Finds the single most severe stock status across all of a facility's medicines.
+    
+    This is used by the frontend to color the facility's map pin based on its most critical need.
+    
+    Args:
+        db (Session): The database session.
+        facility_id (int): The ID of the facility.
+        
+    Returns:
+        Optional[StockStatus]: The most severe status level found, or None if no inventory exists.
+    """
     statuses = set(
         db.execute(
             select(FacilityInventory.status).where(FacilityInventory.facility_id == facility_id)
@@ -97,16 +129,25 @@ def get_facility_worst_status(db: Session, facility_id: int) -> Optional[StockSt
 
 
 def needs_supply_request(db: Session, facility_id: int, medicine_id: int) -> bool:
-    """True if this facility/medicine pair is currently critical or warning
-    — the trigger condition escalation.py checks before creating a transfer
-    request or suggesting a quantity. Relies on .status already being
-    up to date — call refresh_facility_medicine_status() first if unsure."""
+    """
+    Determines if a facility/medicine pair currently needs a supply request.
+    
+    Args:
+        db (Session): The database session.
+        facility_id (int): The ID of the facility.
+        medicine_id (int): The ID of the medicine.
+        
+    Returns:
+        bool: True if the status is critical or warning, False otherwise.
+    """
     inventory = db.execute(
         select(FacilityInventory).where(
             FacilityInventory.facility_id == facility_id,
             FacilityInventory.medicine_id == medicine_id,
         )
     ).scalar_one_or_none()
+    
     if inventory is None or inventory.status is None:
         return False
+        
     return inventory.status in (StockStatus.critical, StockStatus.warning)

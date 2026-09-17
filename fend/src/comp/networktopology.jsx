@@ -1,23 +1,133 @@
+/**
+ * networktopology.jsx
+ * Displays a hierarchical topology of the supply network.
+ * Visualizes distributors, hospitals, and clinics along with animated active and proposed transfer routes.
+ */
 import React, { useState, useEffect, useRef } from 'react';
 import { getFacilities, getTransfers, subscribeToNetworkUpdates } from '../api';
+
+const STYLES = {
+    outerContainer: {
+        width: '100%',
+        overflowX: 'hidden',
+        backgroundColor: '#ffffff',
+        borderRadius: '16px',
+        border: '1px solid #e2e8f0',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+    },
+    canvas: {
+        position: 'relative',
+        width: '100%',
+        minHeight: '660px',
+        padding: '24px 28px',
+        boxSizing: 'border-box',
+        backgroundColor: '#F5F5F7',
+        userSelect: 'none'
+    },
+    headerBar: {
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: '20px',
+        zIndex: 20,
+        position: 'relative'
+    },
+    headerTitleContainer: { display: 'flex', alignItems: 'center', gap: '8px' },
+    headerTitle: { fontSize: '15px', fontWeight: 800, color: '#0f172a' },
+    headerBadge: {
+        fontSize: '11px',
+        backgroundColor: '#e0e7ff',
+        color: '#3730a3',
+        padding: '2px 8px',
+        borderRadius: '12px',
+        fontWeight: 700
+    },
+    headerSubtitle: { margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' },
+    legend: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '11.5px',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        backdropFilter: 'blur(10px)',
+        padding: '8px 16px',
+        borderRadius: '24px',
+        border: '1px solid rgba(226, 232, 240, 0.8)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
+    },
+    legendItem: { display: 'flex', alignItems: 'center', gap: '5px' },
+    legendDot: (color) => ({ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: color }),
+    svgLayer: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', zIndex: 5 },
+    distributorCard: {
+        padding: '12px 24px',
+        borderRadius: '12px',
+        backgroundColor: '#0f172a',
+        color: '#ffffff',
+        border: '2px solid #334155',
+        cursor: 'pointer',
+        textAlign: 'center',
+        boxShadow: '0 6px 16px rgba(15, 23, 42, 0.15)',
+        minWidth: '240px'
+    },
+    hospitalCard: {
+        width: '100%',
+        maxWidth: '300px',
+        padding: '12px 18px',
+        borderRadius: '12px',
+        backgroundColor: '#ffffff',
+        border: '2px solid #cbd5e1',
+        cursor: 'pointer',
+        textAlign: 'center',
+        boxShadow: '0 4px 10px rgba(0,0,0,0.04)'
+    },
+    tooltip: (pos) => ({
+        position: 'absolute',
+        left: `${pos.x}px`,
+        top: `${pos.y}px`,
+        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+        color: '#ffffff',
+        padding: '12px 14px',
+        borderRadius: '10px',
+        fontSize: '12px',
+        pointerEvents: 'none',
+        zIndex: 100,
+        width: '220px',
+        boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
+        backdropFilter: 'blur(4px)',
+        border: '1px solid rgba(255,255,255,0.1)'
+    }),
+    clusterBox: (colors) => ({
+        backgroundColor: colors.bg,
+        border: `1.5px solid ${colors.border}`,
+        borderRadius: '14px',
+        padding: '16px 14px',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: '12px'
+    })
+};
 
 export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal }) {
     const [facilities, setFacilities] = useState([]);
     const [transfers, setTransfers] = useState([]);
     const [hoveredFacility, setHoveredFacility] = useState(null);
-    const [tooltipPos, setTooltipPos] = useState({ x: 0, y: 0 });
+    const [tooltipPosition, setTooltipPosition] = useState({ x: 0, y: 0 });
     const [hoveredRouteId, setHoveredRouteId] = useState(null);
 
     const outerContainerRef = useRef(null);
     const canvasRef = useRef(null);
     const [nodePositions, setNodePositions] = useState({});
 
+    /**
+     * Fetches facility and transfer data from the API.
+     */
     const loadData = () => {
-        getFacilities().then(res => {
-            if (res && res.features) setFacilities(res.features);
+        getFacilities().then(response => {
+            if (response && response.features) setFacilities(response.features);
         });
-        getTransfers().then(res => {
-            if (res && res.items) setTransfers(res.items);
+        getTransfers().then(response => {
+            if (response && response.items) setTransfers(response.items);
         });
     };
 
@@ -27,19 +137,21 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
         return () => unsubscribe();
     }, []);
 
-    // Compute pixel positions of nodes relative to the canvas
+    /**
+     * Computes the pixel positions of nodes relative to the canvas.
+     */
     const updatePositions = () => {
         if (!canvasRef.current) return;
         const canvasRect = canvasRef.current.getBoundingClientRect();
         const positions = {};
 
-        facilities.forEach(f => {
-            const el = document.getElementById(`topo-node-${f.properties.id}`);
-            if (el) {
-                const r = el.getBoundingClientRect();
-                positions[f.properties.id] = {
-                    x: r.left - canvasRect.left + r.width / 2,
-                    y: r.top - canvasRect.top + r.height / 2
+        facilities.forEach(facility => {
+            const element = document.getElementById(`topo-node-${facility.properties.id}`);
+            if (element) {
+                const elementRect = element.getBoundingClientRect();
+                positions[facility.properties.id] = {
+                    x: elementRect.left - canvasRect.left + elementRect.width / 2,
+                    y: elementRect.top - canvasRect.top + elementRect.height / 2
                 };
             }
         });
@@ -56,28 +168,31 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
         };
     }, [facilities, transfers]);
 
-    const handleMouseEnter = (e, f) => {
+    const handleMouseEnter = (event, facility) => {
         if (!canvasRef.current) return;
-        const r = canvasRef.current.getBoundingClientRect();
-        let x = e.clientX - r.left + 15;
-        let y = e.clientY - r.top + 15;
-        if (x + 240 > r.width) {
-            x = e.clientX - r.left - 240;
+        const canvasRect = canvasRef.current.getBoundingClientRect();
+        let posX = event.clientX - canvasRect.left + 15;
+        let posY = event.clientY - canvasRect.top + 15;
+        
+        // Prevent tooltip from overflowing the right/bottom edge
+        if (posX + 240 > canvasRect.width) {
+            posX = event.clientX - canvasRect.left - 240;
         }
-        if (y + 180 > r.height) {
-            y = e.clientY - r.top - 180;
+        if (posY + 180 > canvasRect.height) {
+            posY = event.clientY - canvasRect.top - 180;
         }
-        setTooltipPos({ x, y });
-        setHoveredFacility(f);
+        
+        setTooltipPosition({ x: posX, y: posY });
+        setHoveredFacility(facility);
     };
 
     const handleMouseLeave = () => {
         setHoveredFacility(null);
     };
 
-    const handleNodeClick = (f) => {
-        if (onSelectFacility) onSelectFacility(f);
-        if (onOpenFacilityModal) onOpenFacilityModal(f);
+    const handleNodeClick = (facility) => {
+        if (onSelectFacility) onSelectFacility(facility);
+        if (onOpenFacilityModal) onOpenFacilityModal(facility);
     };
 
     const getStatusColor = (status) => {
@@ -88,30 +203,30 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
     };
 
     // Separate facilities into hierarchy tiers
-    const distributor = facilities.find(f => f.properties.type === 'distributor');
-    const hospitals = facilities.filter(f => f.properties.type === 'hospital');
-    const getClinicsForHospital = (hospId) => {
-        return facilities.filter(f => f.properties.parent_facility_id === hospId && f.properties.type === 'clinic');
+    const distributor = facilities.find(facility => facility.properties.type === 'distributor');
+    const hospitals = facilities.filter(facility => facility.properties.type === 'hospital');
+    const getClinicsForHospital = (hospitalId) => {
+        return facilities.filter(facility => facility.properties.parent_facility_id === hospitalId && facility.properties.type === 'clinic');
     };
 
     // Active & proposed routes
     const activeRoutes = [];
-    transfers.forEach(t => {
-        if (t.status === 'in_transit' || t.status === 'pending') {
-            t.matches.forEach(m => {
-                if (m.match_status === 'accepted' || m.match_status === 'proposed') {
+    transfers.forEach(transfer => {
+        if (transfer.status === 'in_transit' || transfer.status === 'pending') {
+            transfer.matches.forEach(match => {
+                if (match.match_status === 'accepted' || match.match_status === 'proposed') {
                     activeRoutes.push({
-                        transferId: t.id,
-                        status: t.status,
-                        matchStatus: m.match_status,
-                        sourceId: m.supplying_facility_id,
-                        sourceName: m.supplying_facility_name,
-                        targetId: t.requesting_facility_id,
-                        targetName: t.requesting_facility_name,
-                        medicineName: t.medicine_name,
-                        quantity: m.quantity_offered,
-                        transitMinutes: m.estimated_transit_minutes,
-                        isAccepted: m.match_status === 'accepted'
+                        transferId: transfer.id,
+                        status: transfer.status,
+                        matchStatus: match.match_status,
+                        sourceId: match.supplying_facility_id,
+                        sourceName: match.supplying_facility_name,
+                        targetId: transfer.requesting_facility_id,
+                        targetName: transfer.requesting_facility_name,
+                        medicineName: transfer.medicine_name,
+                        quantity: match.quantity_offered,
+                        transitMinutes: match.estimated_transit_minutes,
+                        isAccepted: match.match_status === 'accepted'
                     });
                 }
             });
@@ -121,14 +236,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
     return (
         <div
             ref={outerContainerRef}
-            style={{
-                width: '100%',
-                overflowX: 'hidden',
-                backgroundColor: '#ffffff',
-                borderRadius: '16px',
-                border: '1px solid #e2e8f0',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-            }}
+            style={STYLES.outerContainer}
         >
             <style>{`
                 @keyframes routeDash {
@@ -164,72 +272,39 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
             {/* Inner Canvas with generous minWidth so right-end clinics are NEVER cut off */}
             <div
                 ref={canvasRef}
-                style={{
-                    position: 'relative',
-                    width: '100%',
-                    minHeight: '660px',
-                    padding: '24px 28px',
-                    boxSizing: 'border-box',
-                    backgroundColor: '#F5F5F7',
-                    userSelect: 'none'
-                }}
+                style={STYLES.canvas}
             >
                 {/* Header Information Bar */}
-                <div style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'center',
-                    marginBottom: '20px',
-                    zIndex: 20,
-                    position: 'relative'
-                }}>
+                <div style={STYLES.headerBar}>
                     <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span style={{ fontSize: '15px', fontWeight: 800, color: '#0f172a' }}>
+                        <div style={STYLES.headerTitleContainer}>
+                            <span style={STYLES.headerTitle}>
                                 Network Supply Chain Flow & Escalation Routes
                             </span>
-                            <span style={{
-                                fontSize: '11px',
-                                backgroundColor: '#e0e7ff',
-                                color: '#3730a3',
-                                padding: '2px 8px',
-                                borderRadius: '12px',
-                                fontWeight: 700
-                            }}>
+                            <span style={STYLES.headerBadge}>
                                 1 Distributor &bull; 3 Hospitals &bull; 12 Clinics
                             </span>
                         </div>
-                        <p style={{ margin: '2px 0 0 0', fontSize: '12px', color: '#64748b' }}>
+                        <p style={STYLES.headerSubtitle}>
                             Hover node for stock bars &bull; Click any node to open Supply Drawer &bull; Real-time animated delivery routes
                         </p>
                     </div>
 
-                    <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '12px',
-                        fontSize: '11.5px',
-                        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-                        backdropFilter: 'blur(10px)',
-                        padding: '8px 16px',
-                        borderRadius: '24px',
-                        border: '1px solid rgba(226, 232, 240, 0.8)',
-                        boxShadow: '0 4px 12px rgba(0,0,0,0.05)'
-                    }}>
+                    <div style={STYLES.legend}>
                         <strong style={{ color: '#1d1d1f' }}>Legend:</strong>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#ef4444' }} />
+                        <div style={STYLES.legendItem}>
+                            <span style={STYLES.legendDot('#ef4444')} />
                             <span>Critical (&lt;15%)</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#f59e0b' }} />
+                        <div style={STYLES.legendItem}>
+                            <span style={STYLES.legendDot('#f59e0b')} />
                             <span>Warning</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                            <span style={{ width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#22c55e' }} />
+                        <div style={STYLES.legendItem}>
+                            <span style={STYLES.legendDot('#22c55e')} />
                             <span>Surplus</span>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        <div style={STYLES.legendItem}>
                             <span style={{ width: '16px', height: '3px', backgroundColor: '#2563eb', display: 'inline-block' }} />
                             <span>In-Transit Route</span>
                         </div>
@@ -238,14 +313,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
 
                 {/* SVG Route Layer */}
                 <svg
-                    style={{
-                        position: 'absolute',
-                        top: 0,
-                        left: 0,
-                        width: '100%',
-                        height: '100%',
-                        zIndex: 5
-                    }}
+                    style={STYLES.svgLayer}
                 >
                     <defs>
                         <marker id="topo-arrow-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -257,17 +325,17 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                     </defs>
 
                     {/* Structural Hierarchy dashed lines */}
-                    {distributor && hospitals.map(h => {
-                        const dPos = nodePositions[distributor.properties.id];
-                        const hPos = nodePositions[h.properties.id];
-                        if (!dPos || !hPos) return null;
+                    {distributor && hospitals.map(hospital => {
+                        const distributorPos = nodePositions[distributor.properties.id];
+                        const hospitalPos = nodePositions[hospital.properties.id];
+                        if (!distributorPos || !hospitalPos) return null;
                         return (
                             <line
-                                key={`h-link-${h.properties.id}`}
-                                x1={dPos.x}
-                                y1={dPos.y + 25}
-                                x2={hPos.x}
-                                y2={hPos.y - 25}
+                                key={`hospital-link-${hospital.properties.id}`}
+                                x1={distributorPos.x}
+                                y1={distributorPos.y + 25}
+                                x2={hospitalPos.x}
+                                y2={hospitalPos.y - 25}
                                 stroke="#cbd5e1"
                                 strokeWidth="1.5"
                                 strokeDasharray="5 5"
@@ -275,21 +343,21 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                         );
                     })}
 
-                    {hospitals.map(h => {
-                        const hPos = nodePositions[h.properties.id];
-                        const clinics = getClinicsForHospital(h.properties.id);
-                        if (!hPos) return null;
+                    {hospitals.map(hospital => {
+                        const hospitalPos = nodePositions[hospital.properties.id];
+                        const clinics = getClinicsForHospital(hospital.properties.id);
+                        if (!hospitalPos) return null;
 
-                        return clinics.map(c => {
-                            const cPos = nodePositions[c.properties.id];
-                            if (!cPos) return null;
+                        return clinics.map(clinic => {
+                            const clinicPos = nodePositions[clinic.properties.id];
+                            if (!clinicPos) return null;
                             return (
                                 <line
-                                    key={`c-link-${c.properties.id}`}
-                                    x1={hPos.x}
-                                    y1={hPos.y + 25}
-                                    x2={cPos.x}
-                                    y2={cPos.y - 25}
+                                    key={`clinic-link-${clinic.properties.id}`}
+                                    x1={hospitalPos.x}
+                                    y1={hospitalPos.y + 25}
+                                    x2={clinicPos.x}
+                                    y2={clinicPos.y - 25}
                                     stroke="#e2e8f0"
                                     strokeWidth="1"
                                 />
@@ -298,21 +366,21 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                     })}
 
                     {/* Active Supply Routes */}
-                    {activeRoutes.map((route, idx) => {
-                        const sPos = nodePositions[route.sourceId];
-                        const tPos = nodePositions[route.targetId];
-                        if (!sPos || !tPos) return null;
+                    {activeRoutes.map((route, index) => {
+                        const sourcePos = nodePositions[route.sourceId];
+                        const targetPos = nodePositions[route.targetId];
+                        if (!sourcePos || !targetPos) return null;
 
                         const isTransit = route.isAccepted;
-                        const dx = tPos.x - sPos.x;
-                        const dy = tPos.y - sPos.y;
-                        const cx = (sPos.x + tPos.x) / 2 - dy * 0.18;
-                        const cy = (sPos.y + tPos.y) / 2 + dx * 0.18;
-                        const pathData = `M ${sPos.x} ${sPos.y} Q ${cx} ${cy} ${tPos.x} ${tPos.y}`;
+                        const deltaX = targetPos.x - sourcePos.x;
+                        const deltaY = targetPos.y - sourcePos.y;
+                        const controlX = (sourcePos.x + targetPos.x) / 2 - deltaY * 0.18;
+                        const controlY = (sourcePos.y + targetPos.y) / 2 + deltaX * 0.18;
+                        const pathData = `M ${sourcePos.x} ${sourcePos.y} Q ${controlX} ${controlY} ${targetPos.x} ${targetPos.y}`;
 
                         return (
                             <g 
-                                key={`svg-route-${route.transferId}-${idx}`}
+                                key={`svg-route-${route.transferId}-${index}`}
                                 onMouseEnter={() => setHoveredRouteId(route.transferId)}
                                 onMouseLeave={() => setHoveredRouteId(null)}
                                 style={{ pointerEvents: 'auto', cursor: 'pointer' }}
@@ -325,7 +393,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                     pointerEvents="stroke"
                                 />
                                 <path
-                                    id={`route-path-${route.transferId}-${idx}`}
+                                    id={`route-path-${route.transferId}-${index}`}
                                     d={pathData}
                                     fill="none"
                                     stroke={isTransit ? 'rgba(37, 99, 235, 0.2)' : 'rgba(245, 158, 11, 0.2)'}
@@ -342,7 +410,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                 {isTransit && (
                                     <polygon points="0,-6 12,0 0,6" fill="#1d4ed8">
                                         <animateMotion dur="2s" repeatCount="indefinite" rotate="auto">
-                                            <mpath href={`#route-path-${route.transferId}-${idx}`} />
+                                            <mpath href={`#route-path-${route.transferId}-${index}`} />
                                         </animateMotion>
                                     </polygon>
                                 )}
@@ -352,20 +420,20 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                 </svg>
 
                 {/* Floating Route Badges with From ➔ To, Units & Time */}
-                {activeRoutes.map((route, idx) => {
+                {activeRoutes.map((route, index) => {
                     if (hoveredRouteId !== route.transferId) return null;
 
-                    const sPos = nodePositions[route.sourceId];
-                    const tPos = nodePositions[route.targetId];
-                    if (!sPos || !tPos) return null;
+                    const sourcePos = nodePositions[route.sourceId];
+                    const targetPos = nodePositions[route.targetId];
+                    if (!sourcePos || !targetPos) return null;
 
-                    const midX = (sPos.x + tPos.x) / 2;
-                    const midY = (sPos.y + tPos.y) / 2 - 18;
+                    const midX = (sourcePos.x + targetPos.x) / 2;
+                    const midY = (sourcePos.y + targetPos.y) / 2 - 18;
                     const isTransit = route.isAccepted;
 
                     return (
                         <div
-                            key={`route-label-${route.transferId}-${idx}`}
+                            key={`route-label-${route.transferId}-${index}`}
                             style={{
                                 position: 'absolute',
                                 left: `${midX}px`,
@@ -414,19 +482,9 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                 id={`topo-node-${distributor.properties.id}`}
                                 className="topo-node-card"
                                 onClick={() => handleNodeClick(distributor)}
-                                onMouseEnter={(e) => handleMouseEnter(e, distributor)}
+                                onMouseEnter={(event) => handleMouseEnter(event, distributor)}
                                 onMouseLeave={handleMouseLeave}
-                                style={{
-                                    padding: '12px 24px',
-                                    borderRadius: '12px',
-                                    backgroundColor: '#0f172a',
-                                    color: '#ffffff',
-                                    border: '2px solid #334155',
-                                    cursor: 'pointer',
-                                    textAlign: 'center',
-                                    boxShadow: '0 6px 16px rgba(15, 23, 42, 0.15)',
-                                    minWidth: '240px'
-                                }}
+                                style={STYLES.distributorCard}
                             >
                                 <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: '#94a3b8', fontWeight: 700 }}>
                                     Tier 0 &bull; Central Logistics Hub
@@ -453,40 +511,30 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                         gridTemplateColumns: 'repeat(3, 1fr)',
                         gap: '24px'
                     }}>
-                        {hospitals.map(h => (
-                            <div key={h.properties.id} style={{ display: 'flex', justifyContent: 'center' }}>
+                        {hospitals.map(hospital => (
+                            <div key={hospital.properties.id} style={{ display: 'flex', justifyContent: 'center' }}>
                                 <div
-                                    id={`topo-node-${h.properties.id}`}
+                                    id={`topo-node-${hospital.properties.id}`}
                                     className="topo-node-card"
-                                    onClick={() => handleNodeClick(h)}
-                                    onMouseEnter={(e) => handleMouseEnter(e, h)}
+                                    onClick={() => handleNodeClick(hospital)}
+                                    onMouseEnter={(event) => handleMouseEnter(event, hospital)}
                                     onMouseLeave={handleMouseLeave}
-                                    style={{
-                                        width: '100%',
-                                        maxWidth: '300px',
-                                        padding: '12px 18px',
-                                        borderRadius: '12px',
-                                        backgroundColor: '#ffffff',
-                                        border: '2px solid #cbd5e1',
-                                        cursor: 'pointer',
-                                        textAlign: 'center',
-                                        boxShadow: '0 4px 10px rgba(0,0,0,0.04)'
-                                    }}
+                                    style={STYLES.hospitalCard}
                                 >
                                     <div style={{ fontSize: '10px', textTransform: 'uppercase', fontWeight: 800, color: '#0284c7' }}>
                                         Tier 1 &bull; Regional Hospital
                                     </div>
                                     <div style={{ fontSize: '14px', fontWeight: 700, color: '#0f172a', margin: '2px 0' }}>
-                                        {h.properties.name}
+                                        {hospital.properties.name}
                                     </div>
                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', fontSize: '11px', color: '#64748b' }}>
                                         <span style={{
                                             width: '8px',
                                             height: '8px',
                                             borderRadius: '50%',
-                                            backgroundColor: getStatusColor(h.properties.worst_status)
+                                            backgroundColor: getStatusColor(hospital.properties.worst_status)
                                         }} />
-                                        <span>Status: <strong style={{ color: getStatusColor(h.properties.worst_status), textTransform: 'capitalize' }}>{h.properties.worst_status === 'in_route' ? 'In Route' : h.properties.worst_status}</strong></span>
+                                        <span>Status: <strong style={{ color: getStatusColor(hospital.properties.worst_status), textTransform: 'capitalize' }}>{hospital.properties.worst_status === 'in_route' ? 'In Route' : hospital.properties.worst_status}</strong></span>
                                     </div>
                                 </div>
                             </div>
@@ -499,27 +547,18 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                         gridTemplateColumns: 'repeat(3, 1fr)',
                         gap: '24px'
                     }}>
-                        {hospitals.map((h, hIdx) => {
-                            const clinics = getClinicsForHospital(h.properties.id);
+                        {hospitals.map((hospital, hospitalIndex) => {
+                            const clinics = getClinicsForHospital(hospital.properties.id);
                             const clusterColors = [
                                 { border: '#bfdbfe', bg: '#eff6ff', title: '#1d4ed8' }, // Alpha
                                 { border: '#c7d2fe', bg: '#eef2ff', title: '#4338ca' }, // Beta
                                 { border: '#ddd6fe', bg: '#f5f3ff', title: '#6d28d9' }  // Gamma
-                            ][hIdx] || { border: '#e2e8f0', bg: '#ffffff', title: '#334155' };
+                            ][hospitalIndex] || { border: '#e2e8f0', bg: '#ffffff', title: '#334155' };
 
                             return (
                                 <div
-                                    key={`cluster-box-${h.properties.id}`}
-                                    style={{
-                                        backgroundColor: clusterColors.bg,
-                                        border: `1.5px solid ${clusterColors.border}`,
-                                        borderRadius: '14px',
-                                        padding: '16px 14px',
-                                        boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
-                                        display: 'flex',
-                                        flexDirection: 'column',
-                                        gap: '12px'
-                                    }}
+                                    key={`cluster-box-${hospital.properties.id}`}
+                                    style={STYLES.clusterBox(clusterColors)}
                                 >
                                     <div style={{
                                         display: 'flex',
@@ -529,7 +568,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                         paddingBottom: '6px'
                                     }}>
                                         <span style={{ fontSize: '12px', fontWeight: 800, color: clusterColors.title }}>
-                                            {h.properties.name.split(' ')[0]} Cluster
+                                            {hospital.properties.name.split(' ')[0]} Cluster
                                         </span>
                                         <span style={{ fontSize: '11px', color: '#64748b', fontWeight: 600 }}>
                                             4 Local Clinics
@@ -538,18 +577,18 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
 
                                     {/* 2x2 Grid of Clinics inside cluster */}
                                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                                        {clinics.map(c => {
-                                            const worst = c.properties.worst_status;
-                                            const isCritical = worst === 'critical';
-                                            const isWarning = worst === 'warning';
+                                        {clinics.map(clinic => {
+                                            const worstStatus = clinic.properties.worst_status;
+                                            const isCritical = worstStatus === 'critical';
+                                            const isWarning = worstStatus === 'warning';
 
                                             return (
                                                 <div
-                                                    key={c.properties.id}
-                                                    id={`topo-node-${c.properties.id}`}
+                                                    key={clinic.properties.id}
+                                                    id={`topo-node-${clinic.properties.id}`}
                                                     className="topo-node-card"
-                                                    onClick={() => handleNodeClick(c)}
-                                                    onMouseEnter={(e) => handleMouseEnter(e, c)}
+                                                    onClick={() => handleNodeClick(clinic)}
+                                                    onMouseEnter={(event) => handleMouseEnter(event, clinic)}
                                                     onMouseLeave={handleMouseLeave}
                                                     style={{
                                                         backgroundColor: '#ffffff',
@@ -570,7 +609,7 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                                             color: '#0f172a',
                                                             lineHeight: 1.2
                                                         }}>
-                                                            {c.properties.name.replace('Clinic ', '')}
+                                                            {clinic.properties.name.replace('Clinic ', '')}
                                                         </div>
                                                         <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
                                                             Tier 2 Clinic
@@ -589,15 +628,15 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                                                             fontSize: '10px',
                                                             fontWeight: 800,
                                                             textTransform: 'uppercase',
-                                                            color: getStatusColor(worst)
+                                                            color: getStatusColor(worstStatus)
                                                         }}>
-                                                            {worst === 'in_route' ? 'IN ROUTE' : worst}
+                                                            {worstStatus === 'in_route' ? 'IN ROUTE' : worstStatus}
                                                         </span>
                                                         <span style={{
                                                             width: '8px',
                                                             height: '8px',
                                                             borderRadius: '50%',
-                                                            backgroundColor: getStatusColor(worst)
+                                                            backgroundColor: getStatusColor(worstStatus)
                                                         }} />
                                                     </div>
                                                 </div>
@@ -610,25 +649,10 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                     </div>
                 </div>
 
-                {/* Hover Tooltip (From Reference Prototype) */}
+                {/* Hover Tooltip */}
                 {hoveredFacility && (
                     <div
-                        style={{
-                            position: 'absolute',
-                            left: `${tooltipPos.x}px`,
-                            top: `${tooltipPos.y}px`,
-                            backgroundColor: 'rgba(15, 23, 42, 0.95)',
-                            color: '#ffffff',
-                            padding: '12px 14px',
-                            borderRadius: '10px',
-                            fontSize: '12px',
-                            pointerEvents: 'none',
-                            zIndex: 100,
-                            width: '220px',
-                            boxShadow: '0 10px 25px -5px rgba(0,0,0,0.5)',
-                            backdropFilter: 'blur(4px)',
-                            border: '1px solid rgba(255,255,255,0.1)'
-                        }}
+                        style={STYLES.tooltip(tooltipPosition)}
                     >
                         <div style={{ fontWeight: 'bold', fontSize: '13px', marginBottom: '2px' }}>
                             {hoveredFacility.properties.name}
@@ -638,16 +662,16 @@ export default function NetworkTopology({ onSelectFacility, onOpenFacilityModal 
                         </div>
 
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                            {hoveredFacility.properties.medicines.map(m => {
-                                const fill = Math.min(100, Math.round((m.current_stock / m.capacity) * 100));
+                            {hoveredFacility.properties.medicines.map(medicine => {
+                                const fillPercentage = Math.min(100, Math.round((medicine.current_stock / medicine.capacity) * 100));
                                 return (
-                                    <div key={m.medicine_id}>
+                                    <div key={medicine.medicine_id}>
                                         <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '2px' }}>
-                                            <span>{m.medicine_name.split(' ')[0]}</span>
-                                            <span style={{ color: getStatusColor(m.status), fontWeight: 700 }}>{Math.round(m.current_stock)}u</span>
+                                            <span>{medicine.medicine_name.split(' ')[0]}</span>
+                                            <span style={{ color: getStatusColor(medicine.status), fontWeight: 700 }}>{Math.round(medicine.current_stock)}u</span>
                                         </div>
                                         <div style={{ width: '100%', height: '5px', backgroundColor: '#334155', borderRadius: '3px', overflow: 'hidden' }}>
-                                            <div style={{ width: `${fill}%`, height: '100%', backgroundColor: getStatusColor(m.status) }} />
+                                            <div style={{ width: `${fillPercentage}%`, height: '100%', backgroundColor: getStatusColor(medicine.status) }} />
                                         </div>
                                     </div>
                                 );

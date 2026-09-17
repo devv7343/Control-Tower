@@ -1,3 +1,8 @@
+/**
+ * mapview.jsx
+ * Renders a geographic map using React-Leaflet to visualize facility locations,
+ * inventory statuses, and animated supply transfer routes.
+ */
 import React, { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polyline, Tooltip, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
@@ -13,7 +18,9 @@ const STATUS_COLORS = {
     default: '#3b82f6'    // fallback blue
 };
 
-// Generates a colored circle marker for facilities
+/**
+ * Generates a colored circle marker for facilities based on their status and type.
+ */
 const createStatusIcon = (status, type) => {
     const color = STATUS_COLORS[status] || STATUS_COLORS.default;
     const size = type === 'distributor' ? 26 : type === 'hospital' ? 22 : 18;
@@ -40,10 +47,12 @@ const createStatusIcon = (status, type) => {
     });
 };
 
-// Creates a prominent on-map route badge at the polyline midpoint showing From ➔ To, Units & Time
+/**
+ * Creates a prominent on-map route badge at the polyline midpoint showing From ➔ To, Units & Time.
+ */
 const createRouteBadgeIcon = (route, zoomLevel = 11.5) => {
     const isTransit = route.isTransit;
-    const bgGradient = isTransit 
+    const backgroundGradient = isTransit 
         ? 'linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%)' 
         : 'linear-gradient(135deg, #78350f 0%, #d97706 100%)';
     const borderColor = isTransit ? '#60a5fa' : '#fcd34d';
@@ -52,7 +61,7 @@ const createRouteBadgeIcon = (route, zoomLevel = 11.5) => {
         className: 'route-badge-marker',
         html: `
             <div style="
-                background: ${bgGradient};
+                background: ${backgroundGradient};
                 color: #ffffff;
                 padding: 3px 6px;
                 border-radius: 12px;
@@ -81,14 +90,116 @@ const createRouteBadgeIcon = (route, zoomLevel = 11.5) => {
     });
 };
 
+/**
+ * A hidden component to listen to map zoom events and update the zoom level state.
+ */
 function MapZoomListener({ setZoomLevel }) {
     useMapEvents({
-        zoomend: (e) => {
-            setZoomLevel(e.target.getZoom());
+        zoomend: (event) => {
+            setZoomLevel(event.target.getZoom());
         }
     });
     return null;
 }
+
+// Extracted styles for MapView component
+const STYLES = {
+    loading: {
+        display: 'flex',
+        height: '520px',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#64748b'
+    },
+    mapWrapper: {
+        height: '520px',
+        width: '100%',
+        borderRadius: '12px',
+        overflow: 'hidden',
+        border: '1px solid #e2e8f0',
+        position: 'relative',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
+    },
+    controlsContainer: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        zIndex: 1000,
+        display: 'flex',
+        gap: '8px',
+        alignItems: 'center'
+    },
+    buttonGroup: {
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        padding: '4px',
+        borderRadius: '8px',
+        boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
+        display: 'flex',
+        gap: '4px'
+    },
+    getButtonStyle: (isActive) => ({
+        padding: '4px 10px',
+        fontSize: '11px',
+        fontWeight: 700,
+        borderRadius: '6px',
+        border: 'none',
+        cursor: 'pointer',
+        backgroundColor: isActive ? '#2563eb' : 'transparent',
+        color: isActive ? '#ffffff' : '#475569'
+    }),
+    routesDropdownToggle: {
+        backgroundColor: 'rgba(15, 23, 42, 0.85)',
+        backdropFilter: 'blur(10px)',
+        color: '#ffffff',
+        padding: '8px 14px',
+        borderRadius: '24px',
+        fontSize: '11.5px',
+        fontWeight: 600,
+        boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+        cursor: 'pointer',
+        userSelect: 'none'
+    },
+    routesDropdownMenu: {
+        position: 'absolute',
+        top: '100%',
+        right: 0,
+        marginTop: '8px',
+        backgroundColor: '#ffffff',
+        borderRadius: '12px',
+        boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
+        border: '1px solid #e2e8f0',
+        width: '280px',
+        maxHeight: '300px',
+        overflowY: 'auto',
+        zIndex: 1001,
+        padding: '12px'
+    },
+    legend: {
+        position: 'absolute',
+        bottom: 24,
+        left: 24,
+        zIndex: 1000,
+        display: 'flex',
+        alignItems: 'center',
+        gap: '12px',
+        fontSize: '11.5px',
+        backgroundColor: 'rgba(255, 255, 255, 0.85)',
+        backdropFilter: 'blur(12px)',
+        padding: '8px 16px',
+        borderRadius: '24px',
+        border: '1px solid rgba(226, 232, 240, 0.8)',
+        boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
+    },
+    legendItem: { display: 'flex', alignItems: 'center', gap: '6px' },
+    getLegendDot: (color) => ({
+        width: '12px',
+        height: '12px',
+        borderRadius: '50%',
+        backgroundColor: color,
+        border: '2px solid white',
+        boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+    })
+};
 
 export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
     const [facilities, setFacilities] = useState([]);
@@ -98,18 +209,22 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
     const [zoomLevel, setZoomLevel] = useState(11.5);
     const [showRoutesDropdown, setShowRoutesDropdown] = useState(false);
 
+    /**
+     * Loads facilities and transfers data concurrently from the backend API.
+     */
     const loadData = () => {
-        Promise.all([getFacilities(), getTransfers()]).then(([facRes, transRes]) => {
-            if (facRes && facRes.type === 'FeatureCollection') {
-                setFacilities(facRes.features);
+        Promise.all([getFacilities(), getTransfers()]).then(([facilityResponse, transferResponse]) => {
+            if (facilityResponse && facilityResponse.type === 'FeatureCollection') {
+                setFacilities(facilityResponse.features);
             }
-            if (transRes && transRes.items) {
-                setTransfers(transRes.items);
+            if (transferResponse && transferResponse.items) {
+                setTransfers(transferResponse.items);
             }
             setIsLoading(false);
         });
     };
 
+    // Load data on mount and subscribe to real-time network updates
     useEffect(() => {
         loadData();
         const unsubscribe = subscribeToNetworkUpdates(loadData);
@@ -118,42 +233,42 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
 
     if (isLoading) {
         return (
-            <div style={{ display: 'flex', height: '520px', alignItems: 'center', justifyContent: 'center', color: '#64748b' }}>
+            <div style={STYLES.loading}>
                 Loading Google Maps background and supply routes...
             </div>
         );
     }
 
-    // Default center Bengaluru
+    // Default center point (Bengaluru)
     const defaultCenter = [12.9650, 77.6000];
 
     // Build geographic routes with coordinates, direction, units, and transit times
-    const geoRoutes = [];
-    transfers.forEach(t => {
-        if (t.status === 'in_transit' || t.status === 'pending') {
-            const reqFac = facilities.find(f => f.properties.id === t.requesting_facility_id);
-            t.matches.forEach(m => {
-                if (m.match_status === 'accepted' || m.match_status === 'proposed') {
-                    const supFac = facilities.find(f => f.properties.id === m.supplying_facility_id);
-                    if (reqFac && supFac) {
-                        const fromCoords = [supFac.geometry.coordinates[1], supFac.geometry.coordinates[0]];
-                        const toCoords = [reqFac.geometry.coordinates[1], reqFac.geometry.coordinates[0]];
-                        const midCoords = [(fromCoords[0] + toCoords[0]) / 2, (fromCoords[1] + toCoords[1]) / 2];
+    const geographicRoutes = [];
+    transfers.forEach(transfer => {
+        if (transfer.status === 'in_transit' || transfer.status === 'pending') {
+            const requestingFacility = facilities.find(facility => facility.properties.id === transfer.requesting_facility_id);
+            transfer.matches.forEach(match => {
+                if (match.match_status === 'accepted' || match.match_status === 'proposed') {
+                    const supplyingFacility = facilities.find(facility => facility.properties.id === match.supplying_facility_id);
+                    if (requestingFacility && supplyingFacility) {
+                        const fromCoordinates = [supplyingFacility.geometry.coordinates[1], supplyingFacility.geometry.coordinates[0]];
+                        const toCoordinates = [requestingFacility.geometry.coordinates[1], requestingFacility.geometry.coordinates[0]];
+                        const midCoordinates = [(fromCoordinates[0] + toCoordinates[0]) / 2, (fromCoordinates[1] + toCoordinates[1]) / 2];
 
-                        geoRoutes.push({
-                            transferId: t.id,
-                            matchId: m.id,
-                            isTransit: m.match_status === 'accepted',
-                            fromCoords: fromCoords,
-                            toCoords: toCoords,
-                            midCoords: midCoords,
-                            supplyingName: supFac.properties.name,
-                            requestingName: reqFac.properties.name,
-                            medicineName: t.medicine_name,
-                            quantity: m.quantity_offered,
-                            transitMinutes: m.estimated_transit_minutes,
-                            distanceKm: m.distance_km,
-                            status: t.status
+                        geographicRoutes.push({
+                            transferId: transfer.id,
+                            matchId: match.id,
+                            isTransit: match.match_status === 'accepted',
+                            fromCoords: fromCoordinates,
+                            toCoords: toCoordinates,
+                            midCoords: midCoordinates,
+                            supplyingName: supplyingFacility.properties.name,
+                            requestingName: requestingFacility.properties.name,
+                            medicineName: transfer.medicine_name,
+                            quantity: match.quantity_offered,
+                            transitMinutes: match.estimated_transit_minutes,
+                            distanceKm: match.distance_km,
+                            status: transfer.status
                         });
                     }
                 }
@@ -166,60 +281,19 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
     const googleSatelliteUrl = "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"; // Hybrid satellite with labels
 
     return (
-        <div style={{
-            height: '520px',
-            width: '100%',
-            borderRadius: '12px',
-            overflow: 'hidden',
-            border: '1px solid #e2e8f0',
-            position: 'relative',
-            boxShadow: '0 2px 6px rgba(0,0,0,0.05)'
-        }}>
+        <div style={STYLES.mapWrapper}>
             {/* Map Controls: Map Style Toggle & Active Route Counter */}
-            <div style={{
-                position: 'absolute',
-                top: 12,
-                right: 12,
-                zIndex: 1000,
-                display: 'flex',
-                gap: '8px',
-                alignItems: 'center'
-            }}>
-                <div style={{
-                    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                    padding: '4px',
-                    borderRadius: '8px',
-                    boxShadow: '0 2px 6px rgba(0,0,0,0.15)',
-                    display: 'flex',
-                    gap: '4px'
-                }}>
+            <div style={STYLES.controlsContainer}>
+                <div style={STYLES.buttonGroup}>
                     <button
                         onClick={() => setMapStyle('roadmap')}
-                        style={{
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: mapStyle === 'roadmap' ? '#2563eb' : 'transparent',
-                            color: mapStyle === 'roadmap' ? '#ffffff' : '#475569'
-                        }}
+                        style={STYLES.getButtonStyle(mapStyle === 'roadmap')}
                     >
                         🗺️ Google Roads
                     </button>
                     <button
                         onClick={() => setMapStyle('satellite')}
-                        style={{
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            fontWeight: 700,
-                            borderRadius: '6px',
-                            border: 'none',
-                            cursor: 'pointer',
-                            backgroundColor: mapStyle === 'satellite' ? '#2563eb' : 'transparent',
-                            color: mapStyle === 'satellite' ? '#ffffff' : '#475569'
-                        }}
+                        style={STYLES.getButtonStyle(mapStyle === 'satellite')}
                     >
                         🛰️ Google Satellite
                     </button>
@@ -228,51 +302,26 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
                 <div style={{ position: 'relative' }}>
                     <div 
                         onClick={() => setShowRoutesDropdown(!showRoutesDropdown)}
-                        style={{
-                            backgroundColor: 'rgba(15, 23, 42, 0.85)',
-                            backdropFilter: 'blur(10px)',
-                            color: '#ffffff',
-                            padding: '8px 14px',
-                            borderRadius: '24px',
-                            fontSize: '11.5px',
-                            fontWeight: 600,
-                            boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                            cursor: 'pointer',
-                            userSelect: 'none'
-                        }}
+                        style={STYLES.routesDropdownToggle}
                     >
-                        🚚 {geoRoutes.length} Active Supply Routes
+                        🚚 {geographicRoutes.length} Active Supply Routes
                     </div>
                     
                     {showRoutesDropdown && (
-                        <div style={{
-                            position: 'absolute',
-                            top: '100%',
-                            right: 0,
-                            marginTop: '8px',
-                            backgroundColor: '#ffffff',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 24px rgba(0,0,0,0.15)',
-                            border: '1px solid #e2e8f0',
-                            width: '280px',
-                            maxHeight: '300px',
-                            overflowY: 'auto',
-                            zIndex: 1001,
-                            padding: '12px'
-                        }}>
+                        <div style={STYLES.routesDropdownMenu}>
                             <h4 style={{ margin: '0 0 10px 0', fontSize: '13px', color: '#0f172a' }}>Active Routes</h4>
-                            {geoRoutes.length === 0 ? (
+                            {geographicRoutes.length === 0 ? (
                                 <div style={{ fontSize: '12px', color: '#64748b' }}>No active routes.</div>
                             ) : (
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                                    {geoRoutes.map((r, i) => (
-                                        <div key={`dropdown-route-${i}`} style={{ padding: '8px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
+                                    {geographicRoutes.map((route, index) => (
+                                        <div key={`dropdown-route-${index}`} style={{ padding: '8px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #f1f5f9' }}>
                                             <div style={{ fontSize: '11px', fontWeight: 600, color: '#334155', marginBottom: '4px' }}>
-                                                {r.supplyingName} ➔ {r.requestingName}
+                                                {route.supplyingName} ➔ {route.requestingName}
                                             </div>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '10px', color: '#64748b' }}>
-                                                <span>{r.quantity}u {r.medicineName}</span>
-                                                <span style={{ color: '#16a34a', fontWeight: 600 }}>{r.transitMinutes}m ETA</span>
+                                                <span>{route.quantity}u {route.medicineName}</span>
+                                                <span style={{ color: '#16a34a', fontWeight: 600 }}>{route.transitMinutes}m ETA</span>
                                             </div>
                                         </div>
                                     ))}
@@ -284,33 +333,18 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
             </div>
 
             {/* Map Legend */}
-            <div style={{
-                position: 'absolute',
-                bottom: 24,
-                left: 24,
-                zIndex: 1000,
-                display: 'flex',
-                alignItems: 'center',
-                gap: '12px',
-                fontSize: '11.5px',
-                backgroundColor: 'rgba(255, 255, 255, 0.85)',
-                backdropFilter: 'blur(12px)',
-                padding: '8px 16px',
-                borderRadius: '24px',
-                border: '1px solid rgba(226, 232, 240, 0.8)',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.1)'
-            }}>
+            <div style={STYLES.legend}>
                 <strong style={{ color: '#1d1d1f' }}>Legend:</strong>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#ef4444', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                <div style={STYLES.legendItem}>
+                    <div style={STYLES.getLegendDot('#ef4444')} />
                     <span style={{ color: '#1d1d1f', fontWeight: 500 }}>Critical</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#f59e0b', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                <div style={STYLES.legendItem}>
+                    <div style={STYLES.getLegendDot('#f59e0b')} />
                     <span style={{ color: '#1d1d1f', fontWeight: 500 }}>Warning</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    <div style={{ width: '12px', height: '12px', borderRadius: '50%', backgroundColor: '#22c55e', border: '2px solid white', boxShadow: '0 1px 3px rgba(0,0,0,0.3)' }} />
+                <div style={STYLES.legendItem}>
+                    <div style={STYLES.getLegendDot('#22c55e')} />
                     <span style={{ color: '#1d1d1f', fontWeight: 500 }}>Surplus</span>
                 </div>
             </div>
@@ -327,55 +361,55 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
                 />
 
                 {/* Draw Route Polylines and Directional Flow on Google Map */}
-                {geoRoutes.map((r, i) => (
-                    <React.Fragment key={`geo-route-group-${r.transferId}-${i}`}>
+                {geographicRoutes.map((route, index) => (
+                    <React.Fragment key={`geo-route-group-${route.transferId}-${index}`}>
                         {/* Outer Glow Polyline */}
                         <Polyline
-                            positions={[r.fromCoords, r.toCoords]}
-                            color={r.isTransit ? '#3b82f6' : '#f59e0b'}
+                            positions={[route.fromCoords, route.toCoords]}
+                            color={route.isTransit ? '#3b82f6' : '#f59e0b'}
                             weight={8}
                             opacity={0.3}
                         />
 
                         {/* Core Animated Route Polyline */}
                         <Polyline
-                            positions={[r.fromCoords, r.toCoords]}
-                            color={r.isTransit ? '#1d4ed8' : '#d97706'}
+                            positions={[route.fromCoords, route.toCoords]}
+                            color={route.isTransit ? '#1d4ed8' : '#d97706'}
                             weight={4}
-                            dashArray={r.isTransit ? '10, 8' : '6, 6'}
+                            dashArray={route.isTransit ? '10, 8' : '6, 6'}
                             opacity={0.95}
                         >
                             <Tooltip sticky>
                                 <div style={{ fontSize: '11px', lineHeight: 1.4 }}>
-                                    <strong style={{ color: r.isTransit ? '#1d4ed8' : '#b45309' }}>
-                                        {r.isTransit ? '🚚 SUPPLY IN TRANSIT' : '⏳ PROPOSED SUPPLY ROUTE'}
+                                    <strong style={{ color: route.isTransit ? '#1d4ed8' : '#b45309' }}>
+                                        {route.isTransit ? '🚚 SUPPLY IN TRANSIT' : '⏳ PROPOSED SUPPLY ROUTE'}
                                     </strong>
                                     <br />
-                                    <strong>Origin:</strong> {r.supplyingName}<br />
-                                    <strong>Destination:</strong> {r.requestingName}<br />
-                                    <strong>Cargo:</strong> {r.medicineName} ({r.quantity} units)<br />
-                                    <strong>Transit Time:</strong> {r.transitMinutes} mins ({r.distanceKm} km)
+                                    <strong>Origin:</strong> {route.supplyingName}<br />
+                                    <strong>Destination:</strong> {route.requestingName}<br />
+                                    <strong>Cargo:</strong> {route.medicineName} ({route.quantity} units)<br />
+                                    <strong>Transit Time:</strong> {route.transitMinutes} mins ({route.distanceKm} km)
                                 </div>
                             </Tooltip>
                         </Polyline>
 
                         {/* Permanent Midpoint Badge displaying Direction, Units and ETA */}
                         <Marker
-                            position={r.midCoords}
-                            icon={createRouteBadgeIcon(r, zoomLevel)}
+                            position={route.midCoords}
+                            icon={createRouteBadgeIcon(route, zoomLevel)}
                         >
                             <Popup minWidth={220}>
                                 <div style={{ fontSize: '12px' }}>
                                     <div style={{ fontWeight: 'bold', color: '#1e293b', marginBottom: '4px' }}>
-                                        Active Transfer #{r.transferId}
+                                        Active Transfer #{route.transferId}
                                     </div>
                                     <div style={{ color: '#475569', marginBottom: '6px' }}>
-                                        From: <strong>{r.supplyingName}</strong><br />
-                                        To: <strong>{r.requestingName}</strong>
+                                        From: <strong>{route.supplyingName}</strong><br />
+                                        To: <strong>{route.requestingName}</strong>
                                     </div>
                                     <div style={{ padding: '6px', background: '#eff6ff', borderRadius: '6px', color: '#1e40af', fontSize: '11px' }}>
-                                        Cargo: <strong>{r.quantity} units</strong> of {r.medicineName}<br />
-                                        Estimated arrival in <strong>{r.transitMinutes} mins</strong> ({r.distanceKm} km)
+                                        Cargo: <strong>{route.quantity} units</strong> of {route.medicineName}<br />
+                                        Estimated arrival in <strong>{route.transitMinutes} mins</strong> ({route.distanceKm} km)
                                     </div>
                                 </div>
                             </Popup>
@@ -383,7 +417,7 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
 
                         {/* Destination Arrow Indicator at recipient coordinate */}
                         <Marker
-                            position={r.toCoords}
+                            position={route.toCoords}
                             icon={L.divIcon({
                                 className: 'dest-arrow',
                                 html: `<div style="
@@ -409,13 +443,13 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
 
                 {/* Facility Markers */}
                 {facilities.map((feature) => {
-                    const [lon, lat] = feature.geometry.coordinates;
+                    const [longitude, latitude] = feature.geometry.coordinates;
                     const { id, name, type, worst_status, medicines } = feature.properties;
 
                     return (
                         <Marker
                             key={id}
-                            position={[lat, lon]}
+                            position={[latitude, longitude]}
                             icon={createStatusIcon(worst_status, type)}
                             eventHandlers={{
                                 click: () => {
@@ -440,21 +474,21 @@ export default function MapView({ onSelectFacility, onOpenFacilityModal }) {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {medicines.map(med => (
-                                                <tr key={med.medicine_id}>
-                                                    <td style={{ padding: '2px 0' }}>{med.medicine_name.split(' ')[0]}</td>
+                                            {medicines.map(medicine => (
+                                                <tr key={medicine.medicine_id}>
+                                                    <td style={{ padding: '2px 0' }}>{medicine.medicine_name.split(' ')[0]}</td>
                                                     <td style={{ padding: '2px 0' }}>
-                                                        {Math.round(med.current_stock)}u
+                                                        {Math.round(medicine.current_stock)}u
                                                         <span
                                                             style={{
                                                                 display: 'inline-block',
                                                                 width: '7px',
                                                                 height: '7px',
                                                                 borderRadius: '50%',
-                                                                backgroundColor: STATUS_COLORS[med.status],
+                                                                backgroundColor: STATUS_COLORS[medicine.status],
                                                                 marginLeft: '5px'
                                                             }}
-                                                            title={med.status}
+                                                            title={medicine.status}
                                                         />
                                                     </td>
                                                 </tr>

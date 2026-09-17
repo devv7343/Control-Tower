@@ -23,6 +23,7 @@ from models import EscalationLevel, FacilityType, StockStatus, TransferStatus
 # GET /facilities — GeoJSON FeatureCollection
 # =================================================================
 class FacilityMedicineStatus(BaseModel):
+    """Represents the inventory status of a specific medicine at a facility."""
     medicine_id: int
     medicine_name: str
     status: StockStatus
@@ -32,6 +33,7 @@ class FacilityMedicineStatus(BaseModel):
 
 
 class FacilityProperties(BaseModel):
+    """Business properties associated with a facility in a GeoJSON feature."""
     id: int
     name: str
     type: FacilityType
@@ -42,17 +44,20 @@ class FacilityProperties(BaseModel):
 
 
 class FacilityGeometry(BaseModel):
+    """GeoJSON Point geometry for a facility."""
     type: Literal["Point"] = "Point"
     coordinates: tuple[float, float]  # [longitude, latitude] — GeoJSON order
 
 
 class FacilityFeature(BaseModel):
+    """GeoJSON Feature representing a single facility on the map."""
     type: Literal["Feature"] = "Feature"
     geometry: FacilityGeometry
     properties: FacilityProperties
 
 
 class FacilityFeatureCollection(BaseModel):
+    """GeoJSON FeatureCollection containing all facilities."""
     type: Literal["FeatureCollection"] = "FeatureCollection"
     features: list[FacilityFeature]
 
@@ -61,6 +66,7 @@ class FacilityFeatureCollection(BaseModel):
 # GET /inventory
 # =================================================================
 class InventoryItem(BaseModel):
+    """Detailed record of a single facility's inventory for one medicine."""
     model_config = ConfigDict(from_attributes=True)
 
     facility_id: int
@@ -74,12 +80,14 @@ class InventoryItem(BaseModel):
 
 
 class InventorySummary(BaseModel):
+    """Aggregated counts of inventory statuses across the network."""
     critical: int
     warning: int
     surplus: int
 
 
 class InventoryResponse(BaseModel):
+    """Full response containing both summary metrics and detailed inventory items."""
     summary: InventorySummary
     items: list[InventoryItem]
 
@@ -88,6 +96,7 @@ class InventoryResponse(BaseModel):
 # GET /forecast — matches forecast_model.py's --json output exactly
 # =================================================================
 class ForecastDay(BaseModel):
+    """Predicted inventory and consumption for a single future day."""
     date: date
     predicted_consumption: float
     predicted_stock: int
@@ -97,6 +106,7 @@ class ForecastDay(BaseModel):
 
 
 class ForecastResponse(BaseModel):
+    """Time-series forecast response for a specific facility and medicine."""
     facility_id: int
     facility_name: Optional[str] = None
     medicine_id: int
@@ -108,12 +118,14 @@ class ForecastResponse(BaseModel):
 # GET /forecast/suggested-quantity
 # =================================================================
 class SuggestedQuantityBasedOn(BaseModel):
+    """The underlying metrics used to calculate the suggested quantity."""
     current_stock: int
     predicted_daily_consumption: float
     lead_time_days: int
 
 
 class SuggestedQuantityResponse(BaseModel):
+    """Recommended quantity to request to survive the resupply lead time."""
     facility_id: int
     medicine_id: int
     suggested_quantity: int
@@ -133,6 +145,7 @@ class TransferRequestCreate(BaseModel):
 
 
 class TransferMatchOut(BaseModel):
+    """A proposed or active supply offer fulfilling part of a transfer request."""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -145,6 +158,7 @@ class TransferMatchOut(BaseModel):
 
 
 class TransferRequestOut(BaseModel):
+    """Detailed transfer request including its current status and matches."""
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -173,6 +187,7 @@ class TransferListResponse(BaseModel):
 # PATCH /transfers/{id}/respond
 # =================================================================
 class TransferRespondRequest(BaseModel):
+    """Payload to accept or reject a proposed transfer match."""
     match_id: int
     action: Literal["accept", "reject"]
     quantity_offered: Optional[int] = None
