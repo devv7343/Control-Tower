@@ -19,8 +19,8 @@ Control Tower is an advanced, full-stack application designed to manage, visuali
 Running Control Tower is incredibly simple. You do not need to install Python, Node.js, or download any dependencies!
 
 1. Go to the GitHub repository's "Releases" page (https://github.com/devv7343/Control-Tower/releases).
-2. Download the `ControlTower.exe` file from the latest release.
-3. Simply double-click the downloaded `ControlTower.exe` file.
+2. Download the `ControlTower.zip` file from the latest release and extract it.
+3. Simply double-click the extracted `ControlTower.exe` file.
 
 - The backend server will start automatically in a background console.
 - Your default web browser will open straight to the application (http://127.0.0.1:8000).
