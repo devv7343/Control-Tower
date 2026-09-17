@@ -14,38 +14,26 @@ Control Tower is an advanced, full-stack application designed to manage, visuali
   Built with React and Vite. It provides a highly interactive user interface including network topologies, map views, triage summaries, forecast charts, and transfer management panels.
 
 ------------------------------------------------------------------------
-2. PREREQUISITES
+2. HOW TO RUN
 ------------------------------------------------------------------------
-- Node.js (for the frontend)
-- Python 3.8+ (for the backend)
+Running Control Tower is incredibly simple. You do not need to install Python, Node.js, or download any dependencies!
 
-------------------------------------------------------------------------
-3. SETUP AND INSTALLATION
-------------------------------------------------------------------------
-Backend Setup:
-1. Navigate to the `bend` directory.
-2. Create and activate a virtual environment.
-3. Install dependencies from requirements (e.g. `pip install fastapi uvicorn sqlalchemy pydantic`).
-
-Frontend Setup:
-1. Navigate to the `fend` directory.
-2. Run `npm install` to install dependencies.
+Simply double-click the `ControlTower.exe` file.
+- The backend server will start automatically in a background console.
+- Your default web browser will open straight to the application (http://127.0.0.1:8000).
+- To stop the application, just close the black console window.
 
 ------------------------------------------------------------------------
-4. RUNNING THE APPLICATION
+3. FOR DEVELOPERS (Building from Source)
 ------------------------------------------------------------------------
-You can start both the frontend and backend simultaneously using the provided startup script:
-
-    start.bat
-
-Alternatively, you can run them separately:
-- Backend: Run `python -m uvicorn main:app --reload --port 8000` from the `bend` directory.
-- Frontend: Run `npm run dev` from the `fend` directory.
-
-The application will be accessible at http://localhost:5173
+If you wish to modify the code and build your own executable:
+1. Navigate to `/fend` and run `npm install` and `npm run build`.
+2. Navigate to `/bend` and set up a Python virtual environment.
+3. Install requirements (`pip install -r requirements.txt`).
+4. Run `pyinstaller ControlTower.spec` to generate the new executable.
 
 ------------------------------------------------------------------------
-5. FEATURES
+4. FEATURES
 ------------------------------------------------------------------------
 - Real-time network topology and map view of facilities.
 - Intelligent medicine transfer routing and approvals.
